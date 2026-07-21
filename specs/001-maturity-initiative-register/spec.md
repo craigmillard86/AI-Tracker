@@ -10,6 +10,16 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-07-21
+
+- Q: What happens when a manager never completes moderation before the cycle locks? → A: Auto-adopt the self-score as the moderated score at cycle close, flagged "unmoderated"; unmoderated % is reported per team/BU alongside completion % (FR-068).
+- Q: Does N<4 suppression need to defend against inference by differencing (e.g., BU minus team exposes a <4 complement)? → A: Yes — threshold plus complement suppression within the fixed hierarchy (FR-014, SC-006).
+- Q: Is this feature spec scoped to Phase 1 MVP only, or Phases 1+2? → A: Phase 1 MVP only. User Story 8 (benchmarking) and other Phase 2/3 items are out of scope, deferred to future feature specs (see Out of Scope subsection; FR-036 and FR-042 tagged Phase 2).
+- Q: Is an assessment cycle global per framework or per-BU? → A: One global monthly cycle per framework; a BU is in scope only once onboarded, and a BU onboarding mid-cycle joins at the next cycle open (FR-002).
+- Q: Adopt the four recommended edge-case behaviours (leave status, manager departure, stage immutability, sub-4 BU display) as binding? → A: Yes, all four — converted to FR-069, FR-070, FR-028 (amended), FR-071.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — Individual Self-Assessment (Priority: P1)
@@ -127,17 +137,9 @@ An EVP/BU Lead completes a lightweight monthly form with Support (internal and c
 
 ---
 
-### User Story 8 — Benchmarking & League Tables (Priority: P2)
+### User Story 8 — Benchmarking & League Tables — OUT OF SCOPE (Phase 2)
 
-Leaders see league tables and comparison views: which BUs are advancing per dimension, which are stalled, and how each BU compares to group/portfolio peers. Intended to drive friendly competition and visibility into capability gaps.
-
-**Why this priority**: Benchmarking is a Phase 2 feature that drives adoption and engagement but is not essential for the MVP's core function (maturity measurement + Harris reporting).
-
-**Independent Test**: Group Leader can view a league table sorted by mean maturity, with trend indicators, in under 3 seconds.
-
-**Acceptance Scenarios**:
-
-1. **Given** a Benchmarking view per dimension, **When** sorted by "Current Score", **Then** BUs are ranked 1–23 with their mean score and prior-cycle movement (+/−).
+Deferred per clarification 2026-07-21: benchmarking league tables and comparison views are a Phase 2 feature (root spec §7) and will be specified in a future feature spec. Story number retained to keep references stable; no requirements in this spec implement it.
 
 ---
 
@@ -159,11 +161,18 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 
 ### Edge Cases
 
-- What happens when a person is on leave or detached from a manager during a cycle? (Recommend: they still assess if registered; managers see them in the list but with "leave" status; later sync updates restore manager linkage.)
-- How does the system handle a manager leaving HIG mid-cycle? (Recommend: assessments already moderated remain; pending reviews are escalated to manager's manager.)
-- What if an initiative's stage is changed retroactively (e.g., "Production" → "Evaluation")? (Recommend: stage history is immutable; only forward changes allowed; Harris submissions use the stage at submission time.)
-- How does small-group suppression (N<4) interact with a BU that is itself <4 people? (Recommend: individual-level view only; team/BU aggregates show as "Insufficient Data" or "Suppressed"; historical aggregates that met N≥4 remain visible.)
+- Person on leave or detached from a manager during a cycle → resolved (FR-069): still invited if registered; shown with "leave" status in the manager's review list; manager linkage restored by subsequent directory syncs.
+- Manager leaves HIG mid-cycle → resolved (FR-070): already-moderated scores stand; pending reviews escalate to the departing manager's manager.
+- Retroactive initiative stage change (e.g., "Production" → "Evaluation") → resolved (FR-028): stage history is immutable and forward-only; Harris submissions read the stage held at submission time.
+- BU or team smaller than 4 people → resolved (FR-071): individual-level views unaffected; aggregates display as "Suppressed"; historical aggregates that met N≥4 at the time remain visible.
 - What if the Harris form structure changes during a cycle? (Recommend: submission reports are tied to a framework version; new form structure becomes available in the next cycle's submission generation.)
+
+### Out of Scope — Deferred to Phase 2/3 Feature Specs
+
+This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope here, to be specified later via their own `/specify` pass:
+
+- **Phase 2**: benchmarking league tables and group heatmap presentation (US8; FR-042), level-up playbooks, showcase views, duplication/consolidation view (FR-036), idea-intake pipeline, governance/value field enforcement, stale-entry nudge tuning, digest emails, deeper trend/calibration/distribution analytics views. (The underlying data these views need — moderated scores per cycle, calibration deltas, stage history — **is** captured in Phase 1.)
+- **Phase 3**: usage telemetry integrations, champions network / enablement tracking, non-engineering frameworks, Power BI schema, Cogito demand-planning API, direct Harris dashboard submission via API.
 
 ---
 
@@ -174,13 +183,14 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 **Module 1: Assessment Framework & Cycles**
 
 - **FR-001**: System MUST support multiple frameworks, each with versions (immutable once a cycle uses them), dimensions (7 per v1 SDLC framework), and level descriptors (0–3 per dimension). Framework content is data, never code: the v1 framework ("AI Maturity in the SDLC") is seeded from `docs/frameworks/ai-maturity-sdlc.v1.json` (authoritative content: root spec Appendix A).
-- **FR-002**: System MUST manage assessment cycles with open/close dates, tied to a framework version. Cycles MUST lock at close; late submissions require admin override.
+- **FR-002**: System MUST manage assessment cycles with open/close dates, tied to a framework version. A cycle is **global per framework**: one cycle open at a time per framework, spanning all onboarded BUs mapped to it; a BU onboarding mid-cycle joins at the next cycle open. Cycles MUST lock at close; late submissions require manager or admin override.
 - **FR-003**: System MUST auto-generate invitations for all in-scope individuals (from org sync + BU/framework mapping) when a cycle opens.
 - **FR-004**: System MUST enforce mandatory participation: individuals in registered BUs cannot opt out of an open cycle.
 - **FR-005**: System MUST support contractor exclusion (configurable per cycle): contractors receive no invitations and do not count toward headcount/completion %.
 - **FR-006**: System MUST persist contractor status per individual from directory sync (employee type attribute); manual override layer available for corrections with audit trail.
 - **FR-060**: Assessment cycles MUST run on a monthly cadence, each running the full self + manager review flow. (Cadence keeps trend data fresh; the pre-population and carry-forward defaults in FR-062/FR-063 keep the burden proportionate.)
 - **FR-061**: System MUST send automated reminders to non-responders and escalation summaries to managers and the BU Lead as the cycle close date approaches, and MUST provide live completion dashboards per team/BU/group throughout the open cycle.
+- **FR-069**: A person on leave or temporarily detached from a manager during a cycle MUST still be invited (if in a registered BU), MUST appear in the manager's review list with a "leave" status, and MUST have manager linkage restored automatically by subsequent directory syncs.
 
 **Module 1: Assessment Scoring Workflow**
 
@@ -192,11 +202,14 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 - **FR-012**: System MUST show individuals their moderated scores, comments, and divergence highlights after manager review completes.
 - **FR-062**: The self-assessment form MUST pre-populate with the individual's previous cycle scores (where they exist), so a "no change" month takes seconds to confirm.
 - **FR-063**: Manager review MUST default to carrying forward the prior cycle's moderated score per dimension unless the individual's self-score for that dimension changed.
+- **FR-068**: If manager review is incomplete when the cycle closes, the system MUST auto-adopt the individual's self-score as the moderated score, flagged "unmoderated". Unmoderated assessments remain in all rollups; the unmoderated % MUST be reported per team/BU alongside completion %, and unmoderated scores MUST be excluded from calibration-delta metrics (their delta is definitionally zero).
+- **FR-070**: When a manager leaves HIG mid-cycle, their already-moderated scores MUST stand; their pending reviews MUST escalate to the departing manager's manager (who becomes the reviewer of record for those assessments).
 
 **Module 1: Rollups & Analytics**
 
 - **FR-013**: System MUST compute rollups from moderated scores: Individual → Team → BU → Group → Portfolio.
-- **FR-014**: System MUST apply small-group suppression: suppress any aggregate covering N<4 individuals to prevent inference of individual scores.
+- **FR-014**: System MUST apply small-group suppression: suppress any aggregate covering N<4 individuals, **and** suppress (or coarsen) an aggregate when publishing it alongside its parent/sibling aggregates in the fixed hierarchy would expose a complement group of N<4 by differencing (e.g., a BU of 7 with one team of 4, or a BU containing a single team). v1 publishes only fixed hierarchy rollups — no ad-hoc slicing — so the complement check is evaluated within the hierarchy tree.
+- **FR-071**: Suppressed aggregates MUST display as "Suppressed" (never as zero or blank); individual-level views permitted by the management chain are unaffected by suppression; historical aggregates that met N≥4 at the time they were computed remain visible even if the group later shrinks below 4.
 - **FR-015**: System MUST compute and report mean score per dimension (continuous 0–3) for trend analysis and rollup averages.
 - **FR-016**: System MUST compute and report floor-based level labels: an individual/team's level = minimum dimension score (only level 2 when all dimensions ≥2).
 - **FR-017**: System MUST track trend over cycles: chart BU, group, portfolio maturity trajectory per dimension.
@@ -216,7 +229,7 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 
 - **FR-026**: System MUST support initiative entity with: Name, BU, sponsor (exec), owner (delivery lead), description, date registered.
 - **FR-027**: System MUST support initiative classification: category aligned to the Harris AI Dashboard taxonomy (AI Product Feature / Pre-Built Agent deployed at customers / Custom Agent deployed at customers / Digital Worker internal to Harris / Other — internal-only, **not group-reported**), function(s), dimensions advanced (multi-select), AI-DLC level (1–3).
-- **FR-028**: System MUST support initiative lifecycle: stage (Idea → Evaluation → Pilot → Production → Scaled → Retired) with stage history and dates.
+- **FR-028**: System MUST support initiative lifecycle: stage (Idea → Evaluation → Pilot → Production → Scaled → Retired) with stage history and dates. Stage history is **immutable and forward-only** — no retroactive edits; corrections are made by a new forward transition. Harris submissions read the stage held at submission time (and, for retired initiatives, the stage held when retired, per FR-064).
 - **FR-029**: System MUST support value capture: value hypothesis, NR capture (Direct/Indirect, One-Time/Recurring, $USD with descriptions), measured value to date, effort/cost band.
 - **FR-030**: System MUST support governance & risk: data sensitivity, regulatory relevance, risk tier, approval status, human-oversight model.
 - **FR-031**: System MUST track # unique customers in production (for customer-deployed categories).
@@ -227,7 +240,7 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 
 - **FR-034**: System MUST allow Manager+ to create initiatives; BU Lead can edit/curate all entries in their BU. No approval workflow in v1.
 - **FR-035**: System MUST support full-text search and faceted filtering (BU, stage, category, risk tier, model/vendor, dimension) on the initiative register.
-- **FR-036**: System MUST provide a duplication/consolidation view: initiatives grouped by category/technology across BUs to identify independent builds of the same capability.
+- **FR-036** *(Phase 2 — deferred)*: System MUST provide a duplication/consolidation view: initiatives grouped by category/technology across BUs to identify independent builds of the same capability. (Data model support — category/technology tagging — ships in Phase 1 via FR-027/FR-032; the view is Phase 2.)
 - **FR-037**: System MUST enforce weekly update discipline for active initiatives (Evaluation → Scaled): nag owners at 7 days; escalate to BU Lead at 14 days overdue.
 - **FR-038**: System MUST provide data-quality scoring per BU: update timeliness (% current) + completeness of value/governance fields.
 - **FR-039**: System MUST support CSV/Excel export of initiative register.
@@ -236,7 +249,7 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 **Module 2: Cross-Module Integration**
 
 - **FR-041**: System MUST provide BU scorecards: maturity per dimension alongside initiative counts/stages per dimension.
-- **FR-042**: System MUST provide group heatmap: 23 BUs × 7 dimensions, colored by mean maturity, with initiative counts overlaid.
+- **FR-042** *(Phase 2 — deferred)*: System MUST provide group heatmap: 23 BUs × 7 dimensions, colored by mean maturity, with initiative counts overlaid. (Phase 1 ships tabular rollup views; the heatmap presentation is Phase 2.)
 
 **Reporting & Harris Submissions**
 
@@ -300,7 +313,7 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 - **SC-003**: HHA Cycle 1 baseline: ≥80% of eligible employees (non-contractors) complete both self-assessment and manager review within the cycle window (target: 1 month open).
 - **SC-004**: Harris submission pre-filled data reconciles 100% to underlying register + declaration records. No line-item in the submission contains a discrepancy > 0% (exact match required).
 - **SC-005**: All individual-level assessment data access is logged; zero reads occur outside the management chain (verified via access-control audit for all 7 seeded roles: Individual, Manager, BU Lead, Group Leader, Portfolio Leader, HIG Executive, Platform Admin).
-- **SC-006**: Small-group suppression (N<4) is enforced: no aggregate or trend view reveals individual-level scores when N<4. Spot-check: attempt to infer 1 individual's score from aggregates covering N=3 people → inference should be impossible.
+- **SC-006**: Small-group suppression (N<4) is enforced: no aggregate or trend view reveals individual-level scores when N<4, **including by differencing** published aggregates against their parent/sibling aggregates. Spot-checks: (a) attempt to infer an individual's score from aggregates covering N=3 people; (b) attempt to derive a <4 complement by subtracting a team aggregate from its BU aggregate → both must be impossible.
 - **SC-007**: Assessment flow is WCAG 2.2 AA compliant: every Individual and Manager user can complete their workflow using keyboard navigation, screen readers, and high-contrast modes without loss of functionality.
 - **SC-008**: System supports ≥23 BUs, ≥500 teams (estimated 3–20 per BU), ≥10,000 people (estimated 300–800 per BU), and can compute all rollups and generate Harris submissions in <30 seconds per BU.
 - **SC-009**: Org sync (Entra ID / HRIS) completes nightly in <30 minutes; no sync failures cause data loss or orphaned records.
