@@ -48,7 +48,7 @@ FR-038's BU data-quality score combines update timeliness and field completeness
 Contractors are excluded from assessment *participation* (FR-005/006), but a contractor can be a line manager. The chain rule (§2) is structural, which would let a contractor manager moderate and therefore view direct reports' individual scores — UK-GDPR-relevant access by a non-employee. **Provisional answer in effect:** yes, the chain is structural; moderation duty follows line management regardless of employee type. Flagged for privacy review (relevant to G1 and the DPIA).
 
 **Blocks:** nothing locally (synthetic data), but the provisional answer shapes HAP-5/HAP-9 chain logic.
-**Status:** OPEN — the provisional above was **REVERSED to restrictive** by the L2 panel; see the dated Q-006 update below (do not read this block's "yes" as current).
+**Status:** **RESOLVED 2026-07-21 — owner-ratified RESTRICTIVE → [DR-0006](DR-0006-contractor-manager-no-individual-access.md).** A contractor manager gets no individual-score access; reviews escalate to the first employee manager. The seam already implements this (`SeamOptions.ContractorManagerPolicy` default), so it is now ratified behaviour, not provisional. See the dated update below.
 
 ## 2026-07-21 · governance · Q-007 — FR citation rule vs governance stories (HAP-22 precedent)
 
@@ -211,8 +211,7 @@ story consumes `HierarchyRoleResolver`'s output for visibility scope) MUST NOT d
 owner-ratified with a structural anchor, or HAP-5's own L3 red-team independently clears the derivation.**
 This is a G1 precondition, not a nice-to-have — G1's own bar is "zero leaks," and an interim-cover
 misassignment is exactly the shape of leak G1 exists to catch.
-**Status:** OPEN — owner ratification required before real-data onboarding AND before any story builds
-visibility scope on these labels; provisional remains in effect for the synthetic local build only.
+**Status:** **RESOLVED-AS-DEFERRED 2026-07-21 (owner decision).** The owner ruled: **keep depth-from-root for now** — accept it as the synthetic-only provisional and revisit before real-data onboarding; do NOT build the structural "leads this unit" anchor yet. This is safe because (a) depth is exactly correct on the synthetic generator, and (b) the seam's individual-read path does not consume the depth tiers at all — it uses the management chain + explicit grants + `HasDirectReports` (see [DR-0005](DR-0005-above-bu-direct-report-read.md)), so the interim-cover misassignment cannot leak an individual score through the shipped seam. **Remaining real-data-onboarding precondition (NOT a build blocker):** on a real org, correctly scoping a BU Lead's BU-wide individual read needs either an explicit `BuDelegate` grant or the anchor; without it a real BU Lead is treated as an ordinary Manager (direct reports only — under-grant, fail-closed). Reopen and build the anchor when real-data onboarding is scheduled.
 
 ## 2026-07-21 · spec 001 / HAP-5 · Q-015 — Does the FR-025 "above-BU leaders see aggregates only" cap bind an above-BU leader who is genuinely in a subject's line-management chain?
 
@@ -329,5 +328,4 @@ direct_report_pending_Q014_G1` asserts the current ALLOW for both cases (and the
 Category=PrivacyReporting, documented to FLIP to `Assert.False` when Q-014 lands and the owner rules
 restrictive. The residual is now a tested, visible fact — not prose-only.
 
-**Status:** RECORD CORRECTED. Code unchanged (round-2 domain + code sign-offs stand over this docs+test delta).
-Residual honestly recorded + pinned; owner ruling on the one-hop above-BU direct read is a G1 decision.
+**Status:** **RESOLVED 2026-07-21 — owner-ratified ALLOW → [DR-0005](DR-0005-above-bu-direct-report-read.md).** The owner ruled the one-hop above-BU direct read is **ALLOWED** (a direct line-manager, any tier, reads their immediate direct report for moderation; transitive/broad reads stay aggregates-only). The residual is therefore **ratified intended behaviour, not a leak** — the shipped seam already implements it. **HAP-8 cross-person read block is LIFTED** for the synthetic build (DR-0005). The pinned test now asserts ratified behaviour and does NOT flip; **HAP-8 (next seam-touching story) must reframe its name/comment from "pending Q-014" to "ratified per DR-0005."** Real-data caveat lives with [Q-014] (deferred).
