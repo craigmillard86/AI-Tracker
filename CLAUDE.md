@@ -73,7 +73,7 @@ As a manager I can review each report's self-scores…
 ## 4. The join — naming that syncs everything
 
 <!-- ticket-prefix: HAP -->
-- **Branch:** `HAP-<n>-fr-<x>-short-slug` (the cost hook extracts `HAP-<n>` from the branch — get this right or the spend is untagged)
+- **Branch:** `HAP-<n>-fr-<x>-short-slug` (the cost hook tags each agent's spend to the story via its worktree branch `HAP-<n>` — get this right or the spend is untagged)
 - **Commit:** `feat(HAP-<n>): message [FR-<x>]` (also `fix|chore|test|docs`)
 - **Worktree:** `../hap-worktrees/HAP-<n>/`
 - **Story file:** carries the same id in frontmatter — the single source for status, estimates, worklogs, closure.
@@ -148,7 +148,7 @@ If your story completes the last piece before a gate, your closure notes must sa
 
 ## 12. Time & money mechanics (summary)
 
-Three signals, never back-filled from each other: **estimates** (frontmatter, set once) · **measured worklogs** (frontmatter, timestamp diffs) · **session cost CSV** (`.claude/cost-log.csv`, written by the session-close hook, tagged via branch name, gitignored, never hand-edited). `scripts/telemetry.sh` joins worklogs + cost log → $/story and hours-vs-estimate. Gaps between the three are calibration data, not embarrassments to smooth over.
+Three signals, never back-filled from each other: **estimates** (frontmatter, set once) · **measured worklogs** (frontmatter, timestamp diffs) · **cost CSV** (`.claude/cost-log.csv` — one row per agent on completion tagged to its story via the worktree branch, plus a `session-lead` row at session end for the orchestration loop; written by the `SubagentStop`/`SessionEnd` cost hook (DR-0007), gitignored, never hand-edited). `scripts/telemetry.sh` joins worklogs + cost log → $/story and hours-vs-estimate (filter `story=session-lead` to separate orchestration overhead). Gaps between the three are calibration data, not embarrassments to smooth over.
 
 ## 13. Hard don'ts
 
