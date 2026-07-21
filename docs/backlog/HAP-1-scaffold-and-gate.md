@@ -5,12 +5,12 @@ epic: E1-foundations
 wave: 0
 fr: [FR-057, FR-067]   # FR-057: infra portion only (mailpit sink + compose runtime); FR-058/FR-059 are deployment-scope, intentionally not cited — see notes
 risk: L2                # trigger: scripts/verify.sh itself + every initial dependency (NuGet & npm)
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-21T13:28:02Z, end: 2026-07-21T13:50:38Z, mins: 23}
   - {phase: qa, start: 2026-07-21T14:04:08Z, end: 2026-07-21T14:15:24Z, mins: 11}
-closure: null
+closure: {sha: 9729f03, files: 49, tests: "backend 3/3; frontend vitest 66 (4 files); verify.sh green (dev+QA independent runs); negative paths proven (NP1-NP3)", risk: L2, panel: [hap-code-reviewer, hap-domain-specialist], date: 2026-07-21}
 ---
 ## Story
 As the platform team, we need the full local skeleton — .NET solution, React app, docker-compose runtime, and the verify.sh gate — so every subsequent story has a green, reviewable baseline to build on.
