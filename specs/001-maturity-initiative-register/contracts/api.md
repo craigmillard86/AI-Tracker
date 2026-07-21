@@ -27,6 +27,8 @@ FetchSnapshotAsync()               → DirectorySnapshot { persons[]: { external
 ```
 Synthetic adapter reads `Hap.Synth` JSON output. Import applies snapshot then re-applies OrgOverrides; import writes are L3.
 
+The `Hap.Synth` JSON additionally carries a leading additive `metadata` envelope — `{ seed, generator_version, person_count, bu_count }` (provenance for the deterministic run; HAP-2). It is **not** part of the `IDirectorySource` contract: the importer ignores it (unknown JSON properties are dropped on deserialisation), and a non-synthetic adapter (e.g. Entra ID) need not emit it. A snapshot with an unresolvable `manager_external_ref`, a self-referential manager, or an unknown `bu_code` is rejected — the whole import fails rather than importing a corrupt hierarchy.
+
 ## Auth
 
 | Method & path | Who | Notes |

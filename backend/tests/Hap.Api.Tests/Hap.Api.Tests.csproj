@@ -12,6 +12,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hap.Api\Hap.Api.csproj" />
+    <!-- Test-only: drives the real deterministic generator so the sync path is exercised
+         against genuine synthetic directory output. Production infrastructure does not
+         reference Hap.Synth. -->
+    <ProjectReference Include="..\..\src\Hap.Synth\Hap.Synth.csproj" />
   </ItemGroup>
 
 </Project>

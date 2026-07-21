@@ -26,7 +26,7 @@ As any of the seven seeded roles, I can sign in via the local dev provider's rol
 - [ ] The claims principal contains person_id + explicit roles only; hierarchy roles (Manager, BU Lead, Group Leader, Portfolio Leader) are computed per request from org data — integration test: promoting a person's manager link changes their computed role without re-sign-in.
 - [ ] A contract test asserts the principal shape matches contracts/api.md (person matched by external_ref) — the seam consumes nothing provider-specific (research D3).
 - [ ] `GET /api/me` returns profile + computed roles for each of the seven seeded users (parameterised integration test).
-- [ ] Unauthenticated requests to any `/api/*` endpoint return 401 (test sweeps all mapped routes).
+- [ ] Unauthenticated requests to any `/api/*` endpoint return 401 (test sweeps all mapped routes). This MUST include the HAP-3 admin endpoints (`POST /api/admin/sync`, `GET/POST /api/admin/overrides`), which shipped un-gated in wave-0 (HAP-3) with the guard left as a marked extension point (`AdminEndpoints.cs` `MapGroup("/api/admin")`).
 - [ ] Sign-in screen uses tokens.css only (no new colours/type sizes); strings externalised (FR-067); axe scan passes (vitest-axe).
 - [ ] `./scripts/verify.sh` green.
 

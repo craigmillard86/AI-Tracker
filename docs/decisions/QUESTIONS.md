@@ -76,3 +76,13 @@ HAP-2 acceptance criterion 3 requires "300–800 people per BU", but edge cases 
 
 **Blocks:** nothing — synthetic Wave-0 data; a reversal (e.g. put the engineered small orgs in extra BUs beyond 23, or as sub-teams of larger BUs) is a generator retune + test update, both reviewed.
 **Status:** OPEN (provisional answer in effect)
+
+## 2026-07-21 · spec 001 / HAP-3 · Q-010 — What does an `OrgOverride` of field `DottedLine` do?
+
+The override layer (FR-023) models three fields: `BusinessUnit`, `Manager`, `DottedLine`. `BusinessUnit` and `Manager` are structural — re-applied on top of every sync so a correction out-lives re-sync. **`DottedLine` has no defined structural effect in the spec.** The management-chain rule that governs individual-score visibility (§2, FR-025) is the *solid-line* manager chain; a dotted line is an advisory/secondary relationship.
+
+**Provisional answer in effect (per CLAUDE.md §6.3):** in v1 a `DottedLine` override is **recorded and audited but advisory only** — it does not alter the management chain and therefore grants no individual-score visibility. If dotted-line relationships should later confer any visibility or reporting effect, that is a safeguarding-seam change (L3) and a decision record, not a silent behaviour change. Uncertainty rounds up: the restrictive interpretation (no visibility) is the safe default for the GDPR seam.
+
+**Blocks:** nothing — HAP-3 records/audits DottedLine overrides; giving them an effect later is an additive L3 change.
+**Owner action:** confirm whether dotted lines carry any visibility/reporting semantics before that feature is built.
+**Status:** OPEN (provisional answer in effect)
