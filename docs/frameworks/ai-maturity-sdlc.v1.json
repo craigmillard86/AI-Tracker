@@ -1,0 +1,92 @@
+{
+  "framework": "AI Maturity in the SDLC",
+  "key": "ai-maturity-sdlc",
+  "version": 1,
+  "status": "draft",
+  "owner": "Craig Millard (Vanguard / HIG AI)",
+  "source": "docs/spec/hig-ai-maturity-platform-specification.md — Appendix A",
+  "immutability": "This version becomes immutable the first time an assessment cycle uses it. Changes after that point require a new version.",
+  "levels": [
+    { "level": 0, "name": "Waterfall / Agile" },
+    { "level": 1, "name": "AI Assisted" },
+    { "level": 2, "name": "AI Directed" },
+    { "level": 3, "name": "AI Delegated" }
+  ],
+  "dimensions": [
+    {
+      "key": "how-ai-is-leveraged",
+      "name": "How AI is leveraged",
+      "descriptors": {
+        "0": "Sporadic task support",
+        "1": "Consistent AI assistance used by individuals",
+        "2": "As a team member executing work under human direction",
+        "3": "A delivery system of agents operating in the background"
+      }
+    },
+    {
+      "key": "examples-usage",
+      "name": "Examples / Usage",
+      "descriptors": {
+        "0": "Various tasks within the SDLC such as writing requirements, writing code, debugging, etc.",
+        "1": "AI suggests lines of code, explains unfamiliar modules, helps debug, or drafts tests",
+        "2": "AI is prompted through idea clarification and design, creates specs, architects, generates code, and tests",
+        "3": "A bug is assigned to AI; it triages, replicates, builds, tests, and returns a proposed solution"
+      }
+    },
+    {
+      "key": "work-unit",
+      "name": "Work unit",
+      "descriptors": {
+        "0": "Tasks and features",
+        "1": "Tasks",
+        "2": "Features",
+        "3": "Full build (tasks, bugs, features, maintenance)"
+      }
+    },
+    {
+      "key": "sdlc-process",
+      "name": "SDLC process",
+      "descriptors": {
+        "0": "Traditional SDLC remains intact",
+        "1": "Traditional SDLC remains intact (faster execution)",
+        "2": "SDLC becomes a faster guided pipeline with AI",
+        "3": "SDLC steps collapse into an asynchronous agent loop"
+      }
+    },
+    {
+      "key": "timing",
+      "name": "Timing",
+      "descriptors": {
+        "0": "Weeks",
+        "1": "Weeks",
+        "2": "Days / hours",
+        "3": "Hours (asynchronous)"
+      }
+    },
+    {
+      "key": "value-measured",
+      "name": "Value measured",
+      "descriptors": {
+        "0": "% of committed work delivered on time",
+        "1": "% of tickets influenced by AI",
+        "2": "% of lines of code built by AI",
+        "3": "% of tickets deflected away from developers"
+      }
+    },
+    {
+      "key": "impact",
+      "name": "Impact",
+      "descriptors": {
+        "0": "n/a",
+        "1": "Max 1× improvement",
+        "2": "10× improvement (with effort)",
+        "3": "20×+ potential ballpark improvement"
+      }
+    }
+  ],
+  "scoring": {
+    "overallScore": "Mean of the seven dimension scores — a continuous 0–3 value used for trend lines and rollup averages.",
+    "levelLabel": "Weakest-dimension floor: an individual's level is the minimum score across the seven dimensions. Level 2 requires every dimension ≥ 2.",
+    "rollups": "Each hierarchy level reports the mean score per dimension plus the distribution of floor-based levels (e.g. '12% of BU at Level 1+')."
+  }
+}
