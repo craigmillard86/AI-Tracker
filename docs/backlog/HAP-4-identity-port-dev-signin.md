@@ -9,12 +9,27 @@ risk: L3                # trigger: HierarchyRoleResolver walks the management ch
                          # 2026-07-21 (hap-domain-specialist finding, session-lead ruling) — first
                          # match / higher class wins, and a reviewer's re-derived class disagreeing
                          # with the declared one forces the higher class per the lead's binding rule.
-status: qa
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-21T17:35:20Z, end: 2026-07-21T19:08:03Z, mins: 92}
   - {phase: qa, start: 2026-07-21T19:13:25Z, end: 2026-07-21T19:25:15Z, mins: 11}
-closure: null
+closure:
+  sha: 4f3f83b
+  files: [backend/src/Hap.Api/Identity/**, backend/src/Hap.Api/AdminEndpoints.cs, backend/src/Hap.Api/FrameworkEndpoints.cs, backend/src/Hap.Api/Program.cs, app/src/screens/signin/**, app/src/design/tokens.css, backend/tests/Hap.Api.Tests/Identity/**, docs/wiki/identity.md]
+  tests: "backend 166 (Api 98 incl. Identity + escalation + fresh-QA adversarial); PrivacyReporting 22; frontend 74; both EF migrations (#1 org/audit, #2 framework) idempotent; verify.sh ALL GREEN"
+  risk: L3
+  reclassified_from: L2
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team, hap-design-reviewer]
+  date: 2026-07-21
+  note: "Reclassified L2→L3 (§7 management-chain-resolver trigger, hap-domain-specialist re-derivation, lead ruling). The added red-team pass FOUND a concrete privilege escalation (authenticated Individual self-reparenting under the org root via the 401-only override endpoint to mint a Portfolio Leader label); ruled fix-now (not deferred): PlatformAdmin (403) now gates all admin surfaces and the escalation is a passing regression test."
+  g1_preconditions:
+    - "Q-014 (hierarchy-tier derivation): depth-from-root tier assignment assumes a uniform-depth org tree — correct for the synthetic generator, misassigns on real org shapes (interim/dual-hat layer, missing tier). Owner-ratification item (Q-006 precedent). HAP-5 (or whichever story consumes HierarchyRoleResolver output for visibility scope) MUST NOT do so until Q-014 is owner-ratified with a structural 'leads this unit' anchor OR HAP-5's own L3 red-team independently clears the derivation. Blocks any non-synthetic BU onboarding."
+    - "Admin-endpoint [PA] gate: DISCHARGED here (PlatformAdmin policy on /api/admin/sync, /api/admin/overrides, /api/admin/frameworks) — this closes the HAP-3 wave-0 deferral for the admin surfaces. HAP-5 still owns the assessment-read 403/404 role-scope matrix."
+  carry_forward:
+    - "HAP-5 handoff (load-bearing): BU-scoped (BuDelegate) grants flatten to a bare role string in the cookie — BusinessUnitId scope is NOT carried in the claim, and claims persist up to the 8h sliding window. The Authorization seam MUST re-read RoleGrant rows from the DB for any BU-scoped decision, never trust the cookie claim alone."
+    - "Future role-grant revoke endpoint (Q-013 addendum, QA finding): the two bootstrap fixtures (Platform Admin, HIG Executive) re-acquire their grant from the seed label on every sign-in via LocalDevProvider.EnsureExplicitGrantAsync — a DB revoke does not stick across a sign-out/sign-in for these two. Not a cross-identity escalation; the revoke endpoint must special-case these fixtures."
+    - "Identity-audit-actor wiring: OrgOverrideService writes actorPersonId:null (HAP-3 deferral). A future story should populate actorPersonId from the authenticated principal's person_id claim and retire CreateOverrideRequest.CreatedBy as a client-supplied field."
 ---
 ## Story
 As any of the seven seeded roles, I can sign in via the local dev provider's role picker and receive a session whose computed roles drive everything I subsequently see, so the app authenticates through the identity port exactly as a future Entra adapter would.
