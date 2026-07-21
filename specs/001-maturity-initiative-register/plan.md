@@ -152,6 +152,7 @@ One agent, one worktree, one sitting each. Risk from CLAUDE.md §7 (first match 
 | HAP-18 | Notifications: cycle reminders/escalations, weekly-update nags, mailpit adapter | FR-037, FR-057, FR-061 | **L2** (notification scheduling) | HAP-7, HAP-14 | Hosted service + admin "run now" for deterministic tests |
 | HAP-19 | Completion & data-quality reporting, CSV export, read API | FR-019, FR-038, FR-039, FR-040 | **L3** (completion reads over Assessments — rounds up) | HAP-11, HAP-14 | Data-quality score = timeliness + field completeness |
 | HAP-20 | G2 readiness: end-to-end reconciliation evidence script + gate walkthrough | SC-004 | **L0** (test/docs only) | HAP-16, HAP-17, HAP-19 | **Flags G2 readiness**; consolidates PrivacyReporting suite coverage report |
+| HAP-21 | Help surface + user guide baseline: in-app contextual help (seeded content) and `docs/user-guide/` assembly | FR-072, FR-073 | **L1** (UI + copy) | HAP-8, HAP-9, HAP-11, HAP-13–15, HAP-17 | Per-flow help content is authored by each UI story (DR-0003); this story ships the help surface and assembles/reconciles the guide. Any new help component needs an A8 amendment first |
 
 ## API surface (summary — full contract in contracts/api.md)
 

@@ -280,6 +280,8 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 - **FR-058**: System MUST support daily backup with tested restore.
 - **FR-059**: System MUST achieve 99.5% availability during business hours.
 - **FR-067**: v1 is English-only, but all user-facing strings MUST be externalised from the start (no hard-coded UI copy) — HIG BUs span multiple countries and later localisation must not require restructuring.
+- **FR-072** *(added 2026-07-21, DR-0003)*: System MUST provide in-app contextual help for the mandated flows (self-assessment, manager moderation, initiative register, BU declarations/metrics, Harris submission review). Help content is versioned seeded data — never hard-coded copy — and each flow's help is authored alongside the story that ships the flow.
+- **FR-073** *(added 2026-07-21, DR-0003)*: A printable end-user guide MUST be maintained at `docs/user-guide/`, covering the same flows and kept consistent with the in-app help; it is updated whenever user-facing behaviour changes.
 
 ### Key Entities
 

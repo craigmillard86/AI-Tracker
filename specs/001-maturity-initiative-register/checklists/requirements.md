@@ -63,4 +63,6 @@ Owner review of the generated spec found 8 fidelity gaps against the root specif
 7. Localisation/string externalisation was absent → **FR-067**.
 8. Cycle reminders and escalation summaries were under-specified → **FR-061**.
 
+2026-07-21 (later, DR-0003): owner adopted documentation rules — **FR-072** (in-app contextual help as seeded data) and **FR-073** (printable user guide at `docs/user-guide/`) added; as-built wiki (`docs/wiki/`) mandated at constitution level; plan gains HAP-21. FR count now 73.
+
 Layout decision (**DR-0002**): feature specs live under `specs/` per the Spec Kit process; the root specification is committed verbatim at `docs/spec/hig-ai-maturity-platform-specification.md`; this feature spec's FR-NNN identifiers are the citation scheme for commits and backlog stories. Known remaining nits (not blocking planning): FR-055 wording vs the identity-port decision, SC-008 team-count arithmetic.
