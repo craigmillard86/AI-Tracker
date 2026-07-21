@@ -1,4 +1,5 @@
 using Hap.Api;
+using Hap.Api.Identity;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Frameworks;
 using Microsoft.EntityFrameworkCore;
@@ -30,14 +31,31 @@ var frameworkDefinitionPath =
 
 builder.Services.AddHapInfrastructure(snapshotPath, frameworkDefinitionPath);
 
+// Path to the seed-users file (scripts/synth/generate.sh output) the local dev provider's
+// role-picker reads (FR-055). Same configurable-path convention as the directory snapshot above.
+var seedUsersPath =
+    builder.Configuration["Hap:SeedUsersPath"]
+    ?? Environment.GetEnvironmentVariable("HAP_SEED_USERS")
+    ?? Path.Combine(AppContext.BaseDirectory, "seed-users.json");
+
+builder.Services.AddHapIdentity(seedUsersPath);
+
 var app = builder.Build();
 
 // Liveness only — deliberately does not touch the database so the container is
 // reported healthy before migrations/seed have run.
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
-app.MapAdminEndpoints();
-app.MapFrameworkEndpoints();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Every /api/** route requires an authenticated session (HAP-4 acceptance bar); /auth/** and
+// /healthz stay outside this group so sign-in itself is reachable anonymously.
+var api = app.MapGroup("/api").RequireAuthorization();
+
+app.MapIdentityEndpoints(api);
+api.MapAdminEndpoints();
+api.MapFrameworkEndpoints();
 
 app.Run();
 

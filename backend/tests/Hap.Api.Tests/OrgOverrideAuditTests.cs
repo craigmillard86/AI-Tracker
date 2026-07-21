@@ -29,6 +29,12 @@ public sealed class OrgOverrideAuditTests
             }));
         using var scope = _factory.NewScope();
         await scope.ServiceProvider.GetRequiredService<DirectoryImportService>().SyncAsync();
+
+        // POST/GET /api/admin/overrides now requires the PlatformAdmin policy (red-team escalation
+        // fix, see RedTeamEscalationTests.cs) — LEAD signs in with the "Platform Admin" seed-role
+        // label so LocalDevProvider's dev-seed bootstrap grants it (QUESTIONS.md Q-013), giving this
+        // fixture the access these tests need without inventing a second synced person.
+        _factory.SeedUsers.Inner = new StubSeedUserSource(new[] { Snap.SeedUser("LEAD", role: "Platform Admin") });
     }
 
     private async Task<Guid> SubjectIdAsync()
@@ -47,6 +53,7 @@ public sealed class OrgOverrideAuditTests
         var subjectId = await SubjectIdAsync();
 
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "LEAD");
         var response = await client.PostAsJsonAsync("/api/admin/overrides", new
         {
             personId = subjectId,
@@ -60,10 +67,13 @@ public sealed class OrgOverrideAuditTests
         using var scope = _factory.NewScope();
         var db = scope.ServiceProvider.GetRequiredService<HapDbContext>();
         Assert.Equal(1, await db.OrgOverrides.CountAsync());
-        var audits = await db.AuditLogs.ToListAsync();
-        Assert.Single(audits);
-        Assert.Equal(AuditAction.OrgOverride, audits[0].Action);
-        Assert.Equal(subjectId, audits[0].SubjectPersonId);
+        // Signing in as LEAD (now "Platform Admin"-labelled so it can reach this now-gated
+        // endpoint — see BLOCKING 5 in the story notes) itself produces one RoleGrant audit row
+        // via LocalDevProvider's dev-seed bootstrap; the criterion under test here is specifically
+        // "exactly one audit row per OVERRIDE write", so filter to that action.
+        var overrideAudits = await db.AuditLogs.Where(a => a.Action == AuditAction.OrgOverride).ToListAsync();
+        Assert.Single(overrideAudits);
+        Assert.Equal(subjectId, overrideAudits[0].SubjectPersonId);
     }
 
     // --- Criterion 6: audit failure fails the operation closed (PrivacyReporting) ------------
@@ -222,6 +232,7 @@ public sealed class OrgOverrideAuditTests
         var subjectId = await SubjectIdAsync();
 
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "LEAD");
         var response = await client.PostAsJsonAsync("/api/admin/overrides", new
         {
             personId = subjectId,

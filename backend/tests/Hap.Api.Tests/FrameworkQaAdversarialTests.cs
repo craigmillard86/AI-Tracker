@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Hap.Domain.Frameworks;
 using Hap.Infrastructure;
+using Hap.Infrastructure.Directory;
 using Hap.Infrastructure.Frameworks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,10 +35,31 @@ public sealed class FrameworkLockBypassQaTests
 
     public FrameworkLockBypassQaTests(HapApiFactory factory) => _factory = factory;
 
-    private async Task<FrameworkVersion> SeedAndLockV1Async()
+    // AUTH NOTE (post-HAP-4 rebase): /api/admin/frameworks now requires PlatformAdmin — bootstrap
+    // one signed-in admin fixture per reset so every HTTP call in this file (including a fresh
+    // client created after SeedAndLockV1Async) can authenticate via SignedInClientAsync.
+    private async Task BootstrapAdminFixtureAsync()
     {
         await _factory.ResetAsync();
+        _factory.Directory.Inner = new StubDirectorySource(Snap.Of(
+            new[] { Snap.Bu("BU01") },
+            new[] { Snap.Person("FRAMEWORK-ADMIN", "BU01") }));
+        using var scope = _factory.NewScope();
+        await scope.ServiceProvider.GetRequiredService<DirectoryImportService>().SyncAsync();
+        _factory.SeedUsers.Inner = new StubSeedUserSource(new[] { Snap.SeedUser("FRAMEWORK-ADMIN", role: "Platform Admin") });
+    }
+
+    private async Task<HttpClient> SignedInClientAsync()
+    {
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "FRAMEWORK-ADMIN");
+        return client;
+    }
+
+    private async Task<FrameworkVersion> SeedAndLockV1Async()
+    {
+        await BootstrapAdminFixtureAsync();
+        var client = await SignedInClientAsync();
         await client.PostAsync("/api/admin/frameworks", content: null);
 
         using var scope = _factory.NewScope();
@@ -126,7 +148,7 @@ public sealed class FrameworkLockBypassQaTests
         // finding as the raw-factory tests above — recorded here as the examined, closed path.
         var lockedVersion = await SeedAndLockV1Async();
 
-        var client = _factory.CreateClient();
+        var client = await SignedInClientAsync();
         var response = await client.PostAsync("/api/admin/frameworks", content: null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -151,8 +173,8 @@ public sealed class FrameworkLockBypassQaTests
     [Fact]
     public async Task Reseeding_after_a_manually_deleted_descriptor_row_does_not_restore_it_a_real_no_self_heal_finding()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        await BootstrapAdminFixtureAsync();
+        var client = await SignedInClientAsync();
         await client.PostAsync("/api/admin/frameworks", content: null);
 
         using (var corruptScope = _factory.NewScope())

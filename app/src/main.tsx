@@ -9,6 +9,7 @@ import '@fontsource/inter-tight/700.css';
 
 import './design/tokens.css';
 import './shell/AppShell.css';
+import './screens/signin/SignInScreen.css';
 import { App } from './App';
 
 const rootElement = document.getElementById('root');

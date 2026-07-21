@@ -1,12 +1,18 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Hap.Domain.Audit;
 using Hap.Domain.Org;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Directory;
+using Hap.Synth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+
+// Both Hap.Synth and the directory port define a "DirectorySnapshot"; this file means the port
+// type (what StubDirectorySource/DirectoryImportService consume) everywhere it's unqualified.
+using DirectorySnapshot = Hap.Infrastructure.Directory.DirectorySnapshot;
 
 namespace Hap.Api.Tests;
 
@@ -43,6 +49,12 @@ public sealed class QaAdversarialTests
         _factory.Directory.Inner = new StubDirectorySource(Snap.Of(bus, persons));
         using var scope = _factory.NewScope();
         await scope.ServiceProvider.GetRequiredService<DirectoryImportService>().SyncAsync();
+
+        // POST/GET /api/admin/overrides now requires the PlatformAdmin policy (red-team escalation
+        // fix, see RedTeamEscalationTests.cs) — LEAD signs in with the "Platform Admin" seed-role
+        // label so LocalDevProvider's dev-seed bootstrap grants it (QUESTIONS.md Q-013), giving this
+        // fixture the access these tests need without inventing a second synced person.
+        _factory.SeedUsers.Inner = new StubSeedUserSource(new[] { Snap.SeedUser("LEAD", role: "Platform Admin") });
     }
 
     private async Task<Guid> SubjectIdAsync()
@@ -73,6 +85,7 @@ public sealed class QaAdversarialTests
         var subjectId = await SubjectIdAsync();
 
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "LEAD");
         var response = await client.PostAsJsonAsync("/api/admin/overrides", new
         {
             personId = subjectId,
@@ -87,9 +100,12 @@ public sealed class QaAdversarialTests
         using var scope = _factory.NewScope();
         var db = scope.ServiceProvider.GetRequiredService<HapDbContext>();
         Assert.Equal(1, await db.OrgOverrides.CountAsync());
-        var audits = await db.AuditLogs.ToListAsync();
-        Assert.Single(audits);
-        Assert.Equal(subjectId, audits[0].SubjectPersonId);
+        // Signing in as LEAD (now "Platform Admin"-labelled — see BLOCKING 5 in the story notes)
+        // itself produces one RoleGrant audit row via the dev-seed bootstrap; filter to the
+        // OrgOverride action, since that write is specifically what this criterion is about.
+        var overrideAudits = await db.AuditLogs.Where(a => a.Action == AuditAction.OrgOverride).ToListAsync();
+        Assert.Single(overrideAudits);
+        Assert.Equal(subjectId, overrideAudits[0].SubjectPersonId);
 
         // Advisory-only per Q-010: confirms the DottedLine write does NOT alter the structural
         // manager chain (only Manager/BusinessUnit overrides do).
@@ -185,6 +201,7 @@ public sealed class QaAdversarialTests
         const string hostileCreatedBy = "tester'); DELETE FROM audit_log; --";
 
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "LEAD");
         var response = await client.PostAsJsonAsync("/api/admin/overrides", new
         {
             personId = subjectId,
@@ -204,7 +221,11 @@ public sealed class QaAdversarialTests
         var stored = await db.OrgOverrides.SingleAsync();
         Assert.Equal(hostileReason, stored.Reason);
         Assert.Equal(hostileCreatedBy, stored.CreatedBy);
-        Assert.Equal(1, await db.AuditLogs.CountAsync());
+        // Signing in as LEAD (now "Platform Admin"-labelled — see BLOCKING 5 in the story notes)
+        // itself produces one RoleGrant audit row via the dev-seed bootstrap, on top of the one
+        // OrgOverride audit row this write produces — 2 total, not 1.
+        Assert.Equal(2, await db.AuditLogs.CountAsync());
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == AuditAction.OrgOverride));
     }
 
     [Fact]
@@ -214,6 +235,7 @@ public sealed class QaAdversarialTests
         var subjectId = await SubjectIdAsync();
 
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "LEAD");
         var response = await client.PostAsJsonAsync("/api/admin/overrides", new
         {
             personId = subjectId,
@@ -276,7 +298,22 @@ public sealed class QaAdversarialTests
         await _factory.ResetAsync();
         _factory.Directory.Inner = new SyntheticDirectoryAdapter(_factory.CanonicalSnapshotPath);
 
+        // HAP-4 gates POST /api/admin/sync behind authentication (see the identical bootstrap
+        // comment in DirectorySyncTests) — bootstrap directly, then exercise the real HTTP
+        // contract with an idempotent re-sync.
+        using (var bootstrapScope = _factory.NewScope())
+        {
+            await bootstrapScope.ServiceProvider.GetRequiredService<DirectoryImportService>().SyncAsync();
+        }
+
+        // This shared, non-parallelised "hap-db" collection lets an earlier test leave SeedUsers
+        // pointed at a narrow stub — restore the canonical list explicitly so AdminRef resolves
+        // regardless of run order.
+        _factory.SeedUsers.Inner = new StubSeedUserSource(_factory.CanonicalSeedUsers);
+
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, Distributions.AdminRef);
+
         var response = await client.PostAsync("/api/admin/sync", content: null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 

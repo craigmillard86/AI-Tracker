@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Threading;
 using Hap.Domain.Frameworks;
 using Hap.Infrastructure;
+using Hap.Infrastructure.Directory;
 using Hap.Infrastructure.Frameworks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,12 @@ namespace Hap.Api.Tests;
 /// draft version never disturbs the active one). FR-054 immutability itself is a domain-level
 /// guard test (Hap.Domain.Tests.FrameworkEntityTests) — nothing in this story's scope writes to
 /// a locked version over HTTP, so there is no integration-level equivalent to exercise.
+///
+/// AUTH NOTE (post-HAP-4 rebase): every route here now requires an authenticated session, and
+/// /api/admin/frameworks additionally requires PlatformAdmin (RedTeamEscalationTests.cs). None of
+/// these tests exercises role-scoping itself, so every test signs in as one bootstrapped
+/// PlatformAdmin fixture via <see cref="AuthenticatedClientAsync"/> — that satisfies both gates
+/// uniformly and keeps the framework-content assertions below unchanged.
 /// </summary>
 [Collection("hap-db")]
 public sealed class FrameworkEndpointsTests
@@ -27,11 +34,27 @@ public sealed class FrameworkEndpointsTests
 
     private static readonly string DefinitionPath = FrameworkDefinitionLocator.ResolveDefaultPath();
 
+    private async Task<HttpClient> AuthenticatedClientAsync()
+    {
+        await _factory.ResetAsync();
+        _factory.Directory.Inner = new StubDirectorySource(Snap.Of(
+            new[] { Snap.Bu("BU01") },
+            new[] { Snap.Person("FRAMEWORK-ADMIN", "BU01") }));
+        using (var scope = _factory.NewScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<DirectoryImportService>().SyncAsync();
+        }
+        _factory.SeedUsers.Inner = new StubSeedUserSource(new[] { Snap.SeedUser("FRAMEWORK-ADMIN", role: "Platform Admin") });
+
+        var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, "FRAMEWORK-ADMIN");
+        return client;
+    }
+
     [Fact]
     public async Task Seed_loads_the_json_into_seven_dimensions_and_twenty_eight_descriptors()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
 
         var response = await client.PostAsync("/api/admin/frameworks", content: null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -53,8 +76,7 @@ public sealed class FrameworkEndpointsTests
     [Fact]
     public async Task Seed_is_idempotent_reseeding_produces_no_duplicates()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
 
         await client.PostAsync("/api/admin/frameworks", content: null);
         var secondResponse = await client.PostAsync("/api/admin/frameworks", content: null);
@@ -78,8 +100,7 @@ public sealed class FrameworkEndpointsTests
         // Q-011 (provisional): the JSON's own "status": "draft" is authoring metadata, not the
         // initial runtime FrameworkVersion.Status — the very first version for a framework is
         // auto-activated so GET /api/frameworks/current is functional immediately after seed.
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
 
         await client.PostAsync("/api/admin/frameworks", content: null);
 
@@ -93,8 +114,7 @@ public sealed class FrameworkEndpointsTests
     [Fact]
     public async Task GetCurrent_returns_active_version_content_matching_the_json_in_order()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
         await client.PostAsync("/api/admin/frameworks", content: null);
 
         var response = await client.GetAsync("/api/frameworks/current");
@@ -138,8 +158,7 @@ public sealed class FrameworkEndpointsTests
     [Fact]
     public async Task GetCurrent_returns_404_when_no_version_is_active_yet()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
 
         var response = await client.GetAsync("/api/frameworks/current");
 
@@ -149,8 +168,7 @@ public sealed class FrameworkEndpointsTests
     [Fact]
     public async Task Creating_a_draft_v2_leaves_v1_untouched_and_current_still_serves_v1()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
         await client.PostAsync("/api/admin/frameworks", content: null);
 
         var beforeCurrent = await (await client.GetAsync("/api/frameworks/current"))
@@ -187,8 +205,7 @@ public sealed class FrameworkEndpointsTests
     [Fact]
     public async Task Admin_list_returns_the_framework_with_its_version_and_lock_status()
     {
-        await _factory.ResetAsync();
-        var client = _factory.CreateClient();
+        var client = await AuthenticatedClientAsync();
         await client.PostAsync("/api/admin/frameworks", content: null);
 
         var response = await client.GetAsync("/api/admin/frameworks");

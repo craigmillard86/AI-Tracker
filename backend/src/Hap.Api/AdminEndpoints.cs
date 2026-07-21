@@ -6,18 +6,27 @@ namespace Hap.Api;
 /// <summary>
 /// Platform-admin surfaces for directory sync and org overrides (contracts/api.md [PA]).
 ///
-/// AUTHORIZATION DEFERRAL (HAP-3, wave 0): these routes are marked [PA] in the contract, but
-/// the <c>IIdentityProvider</c> that supplies the caller's role lands in a later story (HAP-4/5).
-/// Until then the group carries no auth filter — the single extension point below is where the
-/// [PA] guard attaches. These endpoints handle synthetic data only, on a no-network local stack,
-/// and are exercised API-only (QUESTIONS.md Q-004). They MUST be gated before Gate G1.
+/// AUTHORIZATION STATUS (HAP-4): these routes are marked [PA] in the contract and are now fully
+/// gated — nested under Program.cs's authorized <c>/api</c> group (401 for an anonymous caller) AND
+/// requiring the <c>PlatformAdmin</c> policy (403 for an authenticated non-admin). The 403 gate was
+/// closed in this story (not deferred to a later Authorization seam story) after <c>hap-red-team</c>
+/// proved a concrete self-escalation path: an authenticated Individual could POST an override that
+/// reparented themselves under the org root, after which <c>HierarchyRoleResolver</c>'s depth-from-root
+/// rule would label them "Portfolio Leader" (see <c>Hap.Api.Tests/Identity/RedTeamEscalationTests.cs</c>
+/// and the story notes). <c>PlatformAdmin</c> is grantable today via <c>LocalDevProvider</c>'s dev-seed
+/// bootstrap (QUESTIONS.md Q-013); a general role-grant admin endpoint (a later story) will supersede
+/// that bootstrap without touching this gate. These endpoints handle synthetic data only, on a
+/// no-network local stack, and are exercised API-only (QUESTIONS.md Q-004).
 /// </summary>
 public static class AdminEndpoints
 {
-    public static void MapAdminEndpoints(this WebApplication app)
+    /// <summary><paramref name="app"/> is the already-authorized <c>/api</c> group (Program.cs), so
+    /// this group is relative: <c>/api</c> + <c>/admin</c> = <c>/api/admin</c>, unchanged from before.
+    /// <c>RequireAuthorization("PlatformAdmin")</c> here composes with the outer group's "any
+    /// authenticated session" requirement — both must pass.</summary>
+    public static void MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        // TODO(HAP-4/5): attach .RequirePlatformAdmin() here once IIdentityProvider is wired.
-        var admin = app.MapGroup("/api/admin");
+        var admin = app.MapGroup("/admin").RequireAuthorization("PlatformAdmin");
 
         admin.MapPost("/sync", async (DirectoryImportService importer, CancellationToken ct) =>
         {

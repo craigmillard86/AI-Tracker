@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+using Hap.Api.Identity;
 using Hap.Domain.Audit;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Audit;
@@ -29,6 +31,11 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
 {
     public string CanonicalSnapshotPath { get; }
     public SwappableDirectorySource Directory { get; } = new();
+    public SwappableSeedUserSource SeedUsers { get; } = new();
+
+    /// <summary>The canonical generator's seed-user list (HAP-2), for tests that want the real
+    /// seven-role fixture without hand-building one.</summary>
+    public IReadOnlyList<SeedUserRecord> CanonicalSeedUsers { get; }
 
     public HapApiFactory()
     {
@@ -36,6 +43,18 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
         var generated = DirectoryGenerator.Generate(Distributions.CanonicalSeed);
         File.WriteAllText(CanonicalSnapshotPath, SnapshotSerializer.SerializeSnapshot(generated.Snapshot));
         Directory.Inner = new SyntheticDirectoryAdapter(CanonicalSnapshotPath);
+
+        CanonicalSeedUsers = generated.SeedUsers.Users
+            .Select(u => new SeedUserRecord
+            {
+                Role = u.Role,
+                ExternalRef = u.ExternalRef,
+                Name = u.Name,
+                Email = u.Email,
+                BuCode = u.BuCode,
+            })
+            .ToList();
+        SeedUsers.Inner = new StubSeedUserSource(CanonicalSeedUsers);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -57,8 +76,17 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IDirectorySource>();
             services.AddSingleton<IDirectorySource>(Directory);
+
+            services.RemoveAll<ISeedUserSource>();
+            services.AddSingleton<ISeedUserSource>(SeedUsers);
         });
     }
+
+    /// <summary>Signs in as <paramref name="externalRef"/> on <paramref name="client"/> (the client
+    /// must have been created with cookie handling, which <see cref="WebApplicationFactory{TEntryPoint}.CreateClient()"/>
+    /// enables by default) and returns the raw response so callers can assert on status/body too.</summary>
+    public static Task<HttpResponseMessage> SignInAsync(HttpClient client, string externalRef) =>
+        client.PostAsJsonAsync("/auth/signin", new SignInRequest(externalRef));
 
     /// <summary>Truncate every HAP table so each test starts from an empty schema.
     /// The audit_log append-only trigger blocks TRUNCATE (by design, FR-053); this reset is the
@@ -123,6 +151,27 @@ public sealed class ThrowingAuditWriter : IAuditWriter
         throw new InvalidOperationException("audit subsystem unavailable (injected test fault)");
 }
 
+/// <summary>An <see cref="ISeedUserSource"/> whose backing source can be swapped between tests
+/// (mirrors <see cref="SwappableDirectorySource"/>).</summary>
+public sealed class SwappableSeedUserSource : ISeedUserSource
+{
+    public ISeedUserSource Inner { get; set; } = default!;
+
+    public Task<IReadOnlyList<SeedUserRecord>> GetUsersAsync(CancellationToken cancellationToken = default) =>
+        Inner.GetUsersAsync(cancellationToken);
+}
+
+/// <summary>Returns a fixed, in-memory seed-user list.</summary>
+public sealed class StubSeedUserSource : ISeedUserSource
+{
+    private readonly IReadOnlyList<SeedUserRecord> _users;
+
+    public StubSeedUserSource(IReadOnlyList<SeedUserRecord> users) => _users = users;
+
+    public Task<IReadOnlyList<SeedUserRecord>> GetUsersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_users);
+}
+
 /// <summary>Fluent builders for small, readable directory snapshots.</summary>
 public static class Snap
 {
@@ -154,4 +203,20 @@ public static class Snap
 
     public static DirectorySnapshot Of(IEnumerable<DirectoryBu> bus, IEnumerable<DirectoryPerson> persons) =>
         new() { Bus = bus.ToList(), Persons = persons.ToList() };
+
+    /// <summary>A seed-user record for an already-synced <see cref="Person"/> (matched by
+    /// <see cref="Person"/>) — lets a test sign in as an ordinary directory fixture (e.g. "LEAD")
+    /// without needing the full canonical seed-users file. <paramref name="role"/> only matters when
+    /// it names an explicit-grant label ("Platform Admin"/"HIG Executive" — see
+    /// <c>LocalDevProvider</c>/QUESTIONS.md Q-013); any other value is treated as a plain
+    /// hierarchy-tier label with no side effect.</summary>
+    public static SeedUserRecord SeedUser(string externalRef, string role = "Manager", string buCode = "BU01") =>
+        new()
+        {
+            Role = role,
+            ExternalRef = externalRef,
+            Name = externalRef,
+            Email = $"{externalRef}@synth.local".ToLowerInvariant(),
+            BuCode = buCode,
+        };
 }

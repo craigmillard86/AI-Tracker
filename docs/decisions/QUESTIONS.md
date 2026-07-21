@@ -102,3 +102,114 @@ The override layer (FR-023) models three fields: `BusinessUnit`, `Manager`, `Dot
 
 **Blocks:** nothing in HAP-6 — no code path can trigger the two-Active state today. Whichever story adds an admin activation flow must decide the invariant explicitly: `Activate()` auto-demotes the incumbent (a version-level side effect), or the caller is required to `Retire()`/deactivate the old one first (an explicit two-step), or a DB constraint (partial unique index on `(framework_id) WHERE status = 'Active'`) enforces it as a hard invariant regardless of caller discipline.
 **Status:** OPEN
+
+## 2026-07-21 · spec 001 / HAP-4 · Q-013 — Who grants the explicit `RoleGrant` rows the dev fixtures need?
+
+FR-056 splits roles into hierarchy-derived (never stored) and explicit grants (`RoleGrant` table: PlatformAdmin,
+HigExecutive, BuDelegate, GroupViewer). Two of the seven seed users (`Platform Admin`, `HIG Executive`) need an
+explicit grant to show the labelled role at `GET /api/me`, but the role-grant admin endpoint is a later story
+(HAP-3/7/12/18 admin-surfaces list, Q-004) — nothing seeds these rows today.
+
+**Provisional answer in effect:** `LocalDevProvider` (HAP-4) idempotently ensures the grant at sign-in time,
+driven by the seed-users.json `role` field only (Hap.Api never references Hap.Synth/Distributions — no
+hardcoded external_ref), `GrantedBy: "dev-seed"`, audited via the existing `RoleGrant` AuditAction. This is
+scoped to the local dev provider only; the Entra adapter would never run this path, and the role-grant admin
+endpoint superseding it later is additive, not a seam change.
+
+**Blocks:** nothing — synthetic dev-only bootstrapping; a reversal (seed via a fixture/migration instead) is a
+story-ordering change.
+**Status:** OPEN (provisional answer in effect)
+
+### Q-013 addendum — 2026-07-21, HAP-4 QA finding: the dev-seed bootstrap is self-healing, not just idempotent
+
+QA (fresh instance, adversarial re-run) proved empirically — not merely inferred — that
+`EnsureExplicitGrantAsync`'s idempotency cuts both ways: deleting HAP-ADMIN's (or HAP-EXEC's) `RoleGrant` row
+directly in the DB and then having them sign OUT and back IN does **not** clear the revocation. Sign-in
+re-derives the grant fresh from `seed-users.json`'s `role` label every time, so the grant is restored on the
+very next sign-in regardless of any intervening DB state. See
+`Hap.Api.Tests/Identity/QaFreshAdversarialTests.cs`'s
+`Revoking_a_PlatformAdmin_grant_mid_session_does_not_immediately_revoke_the_live_cookie` for the concrete proof
+(both the stale-cookie half, matching HAP-4's own advisory A3, and this sharper self-healing-on-resignin half).
+
+This is **not** a cross-identity escalation (HAP-ADMIN/HAP-EXEC only ever re-acquire their OWN designated role;
+nothing leaks to any other fixture) and is consistent with this entry's "synthetic dev-only bootstrapping"
+framing — there is no revoke endpoint in scope anywhere yet. It is a forward-looking design constraint:
+**whichever later story builds the real role-grant admin/revoke endpoint (the HAP-3/7/12/18 list above) must
+either special-case HAP-ADMIN/HAP-EXEC (the two seed-labelled bootstrap fixtures) or accept that revoking their
+PlatformAdmin/HigExecutive grant via that endpoint alone will be silently undone the next time either fixture
+signs in, because this dev-seed bootstrap keeps running unchanged alongside it.**
+**Blocks:** the future role-grant admin/revoke endpoint story's design (must read this before assuming revoke
+semantics are uniform across all fixtures). Not a HAP-4 blocker.
+**Status:** OPEN (informational; no action required in HAP-4's own scope)
+
+## 2026-07-21 · spec 001 / HAP-4 · Q-014 — How is hierarchy-tier leadership (BU Lead / Group Leader / Portfolio Leader) structurally identified?
+
+RoleGrant's own doc comment says hierarchy roles are "computed from org structure," but no entity
+(`BusinessUnit`/`GroupOrg`/`Portfolio`/`Person`) carries an explicit "this person leads this unit" pointer,
+and HAP-4 cannot add one (HAP-6 owns the only open migration slot). The obvious heuristics fail against the
+generator's own engineered edge cases: "manager homed in a different BU" misclassifies BU01 (which hosts the
+entire Exec→Portfolio→Group→BU leadership chain simultaneously, since BU01 is the first BU of the first group
+of the first portfolio); "manager-subtree spans exactly one BU" misclassifies BU01's BU Lead (the engineered
+cross-BU report, edge (i), leaks one BU02 person into their subtree) and undercounts due to the null-manager
+directory-gap fixture (edge (e), which is deliberately disconnected from any manager chain).
+
+**Provisional answer in effect:** classify by **manager-chain depth from a validated root**, where root =
+active, no manager, **and ≥1 active direct report** (this last clause is what excludes the null-manager
+directory-gap fixture, which has zero reports, from being mistaken for a root). Depth 1 = Portfolio Leader,
+depth 2 = Group Leader, depth 3 = BU Lead — each of whichever BU/Group/Portfolio the person is themselves
+homed in via the existing (non-inferred) `BusinessUnit.GroupId`/`GroupOrg.PortfolioId` FKs. Generic "Manager"
+= has ≥1 active direct report, independent of depth (so a BU Lead is also a Manager, matching contracts/api.md's
+"Manager scope"). HIG Executive (depth 0) is deliberately **not** granted hierarchically — per RoleGrant's own
+doc comment it is an explicit-grant type, so it falls under Q-013 instead. Verified against all seven seed
+users plus the BU01-collapse and null-manager fixtures in `Hap.Api.Tests/Identity/HierarchyRoleResolverTests.cs`.
+
+**Blocks:** nothing locally — correct for the current generator's engineered shape. Flagged for the future
+Authorization (L3) seam story: if a future population shape defeats this heuristic, or if BU-level visibility
+scoping needs a stronger guarantee than depth-inference, add an explicit leader pointer via a reviewed migration.
+**Status:** OPEN (provisional answer in effect)
+
+### Q-014 update — 2026-07-21, HAP-4 L3 panel re-derivation (session-lead ruling)
+
+HAP-4 was reclassified L2 → L3 mid-panel: `HierarchyRoleResolver` walks the management chain (CLAUDE.md §7 L3
+trigger), which an L2 self-classification missed. That re-derivation elevates this entry's status: the
+depth-from-root tier derivation is **not just a dev-provisional any more — it is an owner-ratification item**,
+mirroring the Q-006 contractor-manager precedent. The reason: the algorithm assumes a **uniform-depth org
+tree** (every Portfolio Leader/Group Leader/BU Lead sits at exactly depth 1/2/3 from a single validated root).
+That is true of the synthetic generator's engineered shape (verified in `HierarchyRoleResolverTests`) but is
+**not guaranteed of a real HIG org chart** — a real directory could have uneven depth (e.g. a BU Lead who is
+also, structurally, two hops from the exec instead of three; a portfolio with an extra reporting layer) that
+the depth rule would misclassify. `hap-red-team` is reviewing the resolver now, including this
+uniform-depth-tree misassignment hypothesis and a deactivated-root subtree case the domain specialist raised
+(what happens to computed tiers when the validated root itself is later deactivated mid-tree).
+
+**Blocks:** any non-synthetic BU onboarding — this provisional MUST be ratified by the owner (or superseded by
+a decision record) before real org data reaches this resolver. **HAP-5 (or whichever story builds the
+visibility/Authorization seam) MUST NOT build individual-score visibility scope on these hierarchy-tier labels
+until either (a) this entry is ratified by the owner, or (b) HAP-5's own L3 red-team independently clears the
+derivation for its use case.** Uncertainty rounds up (constitution Art. V) — this is a safeguarding-seam-adjacent
+input even though HierarchyRoleResolver itself does not gate any read today.
+**Status:** OPEN — owner ratification required before real-data onboarding; provisional remains in effect for
+the synthetic local build only.
+
+### Q-014 update — 2026-07-21, hap-red-team confirmed the misassignment concretely (L3 panel round 1)
+
+`hap-red-team`'s finding sharpens the uniform-depth-tree hypothesis above from theoretical to concrete: an
+interim/dual-hat layer inserted anywhere in the chain — e.g.
+`Exec -> PortfolioLeader -> GroupLeader -> InterimCover -> RealBuLead` — makes the depth rule label the
+INTERIM cover person "BU Lead" (they sit at depth 3) and demote the actual BU Lead to "Manager" only (depth
+4, past the recognised range). Two things came out of this round:
+- **Partial fix landed:** a depth-1/2/3 person with **zero active reports** (e.g. a vacated leadership slot)
+  no longer gets a leadership label — `HierarchyRoleResolver` now gates the tier fields on `IsManager` too,
+  not depth alone. See `HierarchyRoleResolverTests.Depth_three_with_zero_active_reports_gets_no_leadership_label`.
+- **NOT fixed (session-lead ruling — correctly out of scope here):** the interim-layer misassignment above,
+  because the interim cover DOES have active reports (the real BU Lead's own reports, transitively) — the
+  `IsManager` gate does not catch it. This is the "deeper misassignment" this entry already flagged; it
+  needs the structural anchor (owner decision + migration), not a code change in HAP-4.
+
+Reaffirming the blocking language above in the strongest terms this round revealed: **HAP-5 (or whichever
+story consumes `HierarchyRoleResolver`'s output for visibility scope) MUST NOT do so until Q-014 is
+owner-ratified with a structural anchor, or HAP-5's own L3 red-team independently clears the derivation.**
+This is a G1 precondition, not a nice-to-have — G1's own bar is "zero leaks," and an interim-cover
+misassignment is exactly the shape of leak G1 exists to catch.
+**Status:** OPEN — owner ratification required before real-data onboarding AND before any story builds
+visibility scope on these labels; provisional remains in effect for the synthetic local build only.

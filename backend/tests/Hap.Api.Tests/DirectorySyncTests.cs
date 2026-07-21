@@ -36,7 +36,26 @@ public sealed class DirectorySyncTests
         await _factory.ResetAsync();
         _factory.Directory.Inner = new SyntheticDirectoryAdapter(_factory.CanonicalSnapshotPath);
 
+        // HAP-4 gates POST /api/admin/sync behind authentication, and signing in needs an
+        // existing Person. Bootstrap by running the same canonical import once directly through
+        // the service (bypassing HTTP — preparation, not the behaviour under test), sign in via
+        // HTTP as one of the resulting seed users, then exercise the real HTTP contract with an
+        // idempotent re-sync of the identical snapshot (SyncAsync upserts by natural key — see
+        // its own doc comment — so re-running it is a no-op at the value level and every
+        // assertion below holds identically to a cold first sync).
+        using (var bootstrapScope = _factory.NewScope())
+        {
+            await bootstrapScope.ServiceProvider.GetRequiredService<DirectoryImportService>().SyncAsync();
+        }
+
+        // This shared, non-parallelised "hap-db" collection lets an earlier test leave SeedUsers
+        // pointed at a narrow stub — restore the canonical list explicitly so AdminRef resolves
+        // regardless of run order.
+        _factory.SeedUsers.Inner = new StubSeedUserSource(_factory.CanonicalSeedUsers);
+
         var client = _factory.CreateClient();
+        await HapApiFactory.SignInAsync(client, Distributions.AdminRef);
+
         var response = await client.PostAsync("/api/admin/sync", content: null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 

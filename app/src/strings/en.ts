@@ -24,4 +24,12 @@ export const en = {
     title: 'Welcome',
     body: 'This is the application shell. Feature screens are delivered in later stories.',
   },
+  signIn: {
+    title: 'Sign in',
+    subtitle: 'Local dev provider — choose a seeded role to continue. No password.',
+    loading: 'Loading available users…',
+    loadError: 'Could not load the sign-in list. Is the API running?',
+    signInError: 'Sign-in failed. Please try again.',
+    signInAsPrefix: 'Sign in as',
+  },
 } as const;

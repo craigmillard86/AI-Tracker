@@ -83,4 +83,7 @@ export const expectedTokens: Record<string, string> = {
   '--radius-card': '10px',
   '--radius-search': '20px',
   '--radius-input': '8px',
+
+  // Shadow Evidence — card-elevation, the one validated card shadow (DESIGN.md "Elevation & Depth")
+  '--shadow-card': '0px 10px 20px 0px rgba(37, 82, 95, 0.08)',
 };

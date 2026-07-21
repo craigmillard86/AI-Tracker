@@ -91,4 +91,7 @@
   --radius-card: 10px;
   --radius-search: 20px;
   --radius-input: 8px;
+
+  /* Shadow Evidence (DESIGN.md "Elevation & Depth" — card-elevation, the one validated card shadow) */
+  --shadow-card: 0px 10px 20px 0px rgba(37, 82, 95, 0.08);
 }

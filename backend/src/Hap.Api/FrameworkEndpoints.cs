@@ -10,9 +10,13 @@ namespace Hap.Api;
 /// authenticated caller (drives the assessment UI entirely from data — FR-001), and
 /// <c>[PA] GET/POST /api/admin/frameworks</c> for platform-admin management.
 ///
-/// AUTHORIZATION DEFERRAL (HAP-6, wave 0): as with <see cref="AdminEndpoints"/>, the admin
-/// group carries no auth filter yet — <c>IIdentityProvider</c> lands in HAP-4/5. These
-/// endpoints handle synthetic/seeded data only and MUST be gated before Gate G1.
+/// AUTHORIZATION STATUS (HAP-4 rebase integration): <paramref name="api"/> is Program.cs's
+/// authorized <c>/api</c> group (any authenticated session — HAP-4), so this whole surface is
+/// no longer anonymous. <c>GET /frameworks/current</c> intentionally stays at that blanket
+/// level (any authenticated role reads it — it drives the assessment UI). The
+/// <c>/admin/frameworks</c> group additionally requires the <c>PlatformAdmin</c> policy, same
+/// as <see cref="AdminEndpoints"/>'s admin group (see AdminEndpoints.cs's doc comment for the
+/// red-team finding that closed this gap).
 ///
 /// POST /api/admin/frameworks runs <see cref="FrameworkSeeder"/> against the configured
 /// definition file, mirroring POST /api/admin/sync's role for the directory snapshot
@@ -21,9 +25,12 @@ namespace Hap.Api;
 /// </summary>
 public static class FrameworkEndpoints
 {
-    public static void MapFrameworkEndpoints(this WebApplication app)
+    /// <summary><paramref name="api"/> is the already-authorized <c>/api</c> group
+    /// (Program.cs), so both routes below are relative: <c>/api</c> + <c>/frameworks/current</c>
+    /// and <c>/api</c> + <c>/admin/frameworks</c>, matching the pre-HAP-4 absolute paths exactly.</summary>
+    public static void MapFrameworkEndpoints(this RouteGroupBuilder api)
     {
-        app.MapGet("/api/frameworks/current", async (HapDbContext db, CancellationToken ct) =>
+        api.MapGet("/frameworks/current", async (HapDbContext db, CancellationToken ct) =>
         {
             var version = await db.FrameworkVersions
                 .Where(v => v.Status == FrameworkVersionStatus.Active)
@@ -65,8 +72,7 @@ public static class FrameworkEndpoints
             return Results.Ok(response);
         });
 
-        // TODO(HAP-4/5): attach .RequirePlatformAdmin() here once IIdentityProvider is wired.
-        var admin = app.MapGroup("/api/admin/frameworks");
+        var admin = api.MapGroup("/admin/frameworks").RequireAuthorization("PlatformAdmin");
 
         admin.MapGet("", async (FrameworkAdminService svc, CancellationToken ct) =>
         {
