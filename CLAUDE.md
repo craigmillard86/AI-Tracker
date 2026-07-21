@@ -33,6 +33,7 @@ HAP/
 │   └── synth/                 ← deterministic synthetic data generators (seeded)
 └── docs/
     ├── spec/                  ← root specification (verbatim; feature specs live in specs/)
+    ├── design/DESIGN.md       ← binding design system (extracted tokens + app addendum; §8.2)
     ├── backlog/               ← THE BACKLOG: one file per story + generated board.md
     ├── decisions/             ← append-only decision records + QUESTIONS.md
     ├── delivery/              ← wave plan
@@ -109,12 +110,13 @@ Commonly misclassified: a "one-line" WHERE-clause change in an assessment query 
 
 ## 8. Phase 2 — Dev loop
 
-1. **TDD by default:** failing test → implementation → green. Tests written now are Dev work; attribute honestly.
-2. Framework content, Harris form structure, taxonomies, hierarchy mappings = **data, not code**. Writing a dimension name in C#/TS means it belongs in `docs/frameworks/` or a seeded table instead.
-3. All assessment reads go through the authorisation layer. Need a query the seam doesn't support? Extend the seam (L3) — never go around it.
-4. Run `./scripts/verify.sh` — **the gate of record**: builds both stacks warnings-as-errors, runs all tests (backend, frontend, lint, typecheck) against a disposable dockerised Postgres, compiles migrations idempotently, and always runs the `PrivacyReporting` regression suite. Requires only Docker + local toolchains. Green exit or the story is not reviewable. Never edit verify.sh to make it pass (verify.sh changes are L2 in their own right).
-5. Launch the review panel sized by class (§7): spawn each reviewer as a separate agent with the diff, the story file, the FR, and — for the domain specialist — the relevant spec section. Record each sign-off in the story file notes. Loop until **zero blocking notes**.
-6. Clock out: take the UTC close timestamp, append the worklog entry `{phase: dev, start, end, mins}` to the frontmatter (floor 1 minute; if >4× estimate, note it — don't shave it). Lost the timestamp? Log **nothing** and say so. Never log "felt like" time. Set `status: qa`, commit.
+1. TDD by default: failing test → implementation → green. Tests written now are Dev work; attribute honestly.
+2. UI work follows `docs/design/DESIGN.md` — components, screens, and copy conform to it; if a story's acceptance criteria conflict with it, that's a QUESTIONS.md item, not a judgment call. Changing DESIGN.md itself is a reviewed commit (L0 minimum), never a drive-by edit inside a feature branch.
+3. Framework content, Harris form structure, taxonomies, hierarchy mappings = data, not code. Writing a dimension name in C#/TS means it belongs in docs/frameworks/ or a seeded table instead.
+4. All assessment reads go through the authorisation layer. Need a query the seam doesn't support? Extend the seam (L3) — never go around it.
+5. Run ./scripts/verify.sh — the gate of record: builds both stacks warnings-as-errors, runs all tests (backend, frontend, lint, typecheck) against a disposable dockerised Postgres, compiles migrations idempotently, and always runs the PrivacyReporting regression suite. Requires only Docker + local toolchains. Green exit or the story is not reviewable. Never edit verify.sh to make it pass (verify.sh changes are L2 in their own right).
+6. Launch the review panel sized by class (§7): spawn each reviewer as a separate agent with the diff, the story file, the FR, and — for the domain specialist — the relevant spec section. Record each sign-off in the story file notes. Loop until zero blocking notes.
+7. Clock out: take the UTC close timestamp, append the worklog entry {phase: dev, start, end, mins} to the frontmatter (floor 1 minute; if >4× estimate, note it — don't shave it). Lost the timestamp? Log nothing and say so. Never log "felt like" time. Set status: qa, commit.
 
 ## 9. Phase 3 — QA loop (different agent instance)
 
