@@ -169,7 +169,7 @@ Grouped by the seam's role scopes. **[S]** = returns aggregates subject to N<4 +
 
 Screens implement their mockup (binding: layout/IA/states); tokens from DESIGN.md. Charts are hand-rolled SVG (no chart library).
 
-| Screen (story) | Mockup | Existing addendum components used | **New components — add to DESIGN.md addendum via reviewed commit before build** |
+| Screen (story) | Mockup | Existing addendum components used | **New components (specified in DESIGN.md §A8, added 2026-07-21)** |
 |---|---|---|---|
 | App shell (HAP-1) | all | deep-navy top bar + left nav (A6), buttons (A4) | — |
 | Sign-in role picker (HAP-4) | — (no mockup; QUESTIONS.md if contested) | cards, buttons | — |

@@ -352,3 +352,24 @@ success = rag-green · warning = rag-amber · error = rag-red · info = brand-te
 - Don't put light-teal text on light surfaces.
 - Don't encode any status by colour alone.
 - Don't introduce a colour, radius, shadow, or type size not in this file — additions go through a reviewed commit to this addendum.
+
+## A8. Application component inventory (authored 2026-07-21, per plan 001)
+
+Components identified by the feature-001 implementation plan, specified here **before build** per CLAUDE.md §8.2. Each is built exclusively from A1–A6 tokens; no new colours, radii, shadows, or type sizes are introduced. Screen ownership per `docs/design/mockups/index.md`.
+
+| Component | Purpose (screen) | Built from | States & accessibility |
+|---|---|---|---|
+| **LevelSelectorCard** | One selectable level-descriptor card (0–3) per dimension (assessment-self) | card radius, body type, brand-teal selected border + light-gray rest | Rest / hover / **selected** (2px brand-teal border + check icon — never colour-only) / keyboard: radio-group semantics, arrow-key navigation |
+| **ProgressStepper** | Dimension progress + projected floor level (assessment-self) | label type, maturity ramp for the floor badge | Announces "dimension x of 7" via aria; floor badge always shows level number |
+| **PurposeBanner** | GDPR purpose-limitation statement (assessment-self, assessment-moderation; FR-066) | ice-blue-surface fill, slate-text, info icon in brand-teal | Static, non-dismissible; `role="note"` |
+| **DivergenceFlag** | Δ badge where self and manager scores diverge (assessment-moderation, harris-submission) | pill chip, rag-amber (Δ≥2 forces comment) / slate (Δ1) | Text always includes the Δ value; at Δ≥2 pairs with required-comment field error state |
+| **ComparisonRow** | Self vs manager score side-by-side per dimension (assessment-moderation) | table-cell type, maturity ramp badges | Both values always printed; divergence carried by DivergenceFlag, not colour |
+| **StatTile** | Headline number + label + trend (dashboard-bu) | card, section-title for the value, label role, sparkline slot | Trend direction as arrow glyph + text, not colour alone |
+| **DimensionBar** | Per-dimension mean bar, hand-rolled SVG (dashboard-bu) | maturity ramp fills, border-gray gridlines at 50% | Value printed at bar end; `role="img"` with computed aria-label |
+| **TrendSparkline** | Compact cycle-trend line, hand-rolled SVG (dashboard-bu, StatTile) | brand-teal stroke, no fill | Decorative (`aria-hidden`) — adjacent text carries the values |
+| **SuppressedCell** | Suppressed aggregate rendering (dashboard-bu; FR-071) | mid-gray-text "—" + reason text, light-gray-surface fill | Never a number, never blank: "— Suppressed (n<4)" or "(complement)"; readable by screen readers |
+| **StaleRowFlag** | Overdue weekly-update treatment on register rows (register-list) | rag-amber (>7d) / rag-red (>14d) chip + day count | Chip text carries the day count; row keeps normal contrast |
+| **StageTimeline** | Forward-only stage history (register-detail; FR-028) | small-label-tracked, brand-teal current node, border-gray connectors | Ordered list semantics; dates printed per node; no interactive states (history is immutable) |
+| **NRLineEditor** | Add/remove NR lines: direction × recurrence × $ (register-detail) | form inputs (8px radius), table layout, tertiary text button "add line" | Row delete is a labelled button; locked rows (submission-referenced) show a lock icon + tooltip text |
+| **EvidencePanel** | Measured maturity distribution beside the declared level (bu-forms, harris-submission) | card, DimensionBar reuse, maturity ramp | Declared-vs-measured divergence rendered via DivergenceFlag + sentence, not colour |
+| **PrintLayout** | Print stylesheet wrapper for the Harris submission (harris-submission; FR-049) | print CSS: white background, page-black text, no shell/nav, table borders border-gray | `@media print` only; on-screen layout unchanged; page-break rules between form sections |
