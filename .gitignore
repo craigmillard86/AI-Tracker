@@ -22,3 +22,6 @@ Thumbs.db
 .idea/
 __pycache__/
 *.pyc
+
+# Generated synthetic directory output (HAP-2 — reproducible via scripts/synth/generate.sh)
+backend/src/Hap.Synth/output/

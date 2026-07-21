@@ -67,3 +67,12 @@ Excluding mid-cycle leavers from the completion denominator (while their submitt
 
 **Blocks:** nothing — a reversal is a query change + test update.
 **Status:** OPEN (provisional answer in effect)
+
+## 2026-07-21 · spec 001 / HAP-2 · Q-009 — "300–800 people per BU" vs engineered sub-4 / single-team / org-of-7 BUs
+
+HAP-2 acceptance criterion 3 requires "300–800 people per BU", but edge cases (b) "≥1 BU with <4 people total", (c) "≥1 BU containing a single team", and (d) "≥1 BU where one sub-team of 4 sits inside an org of 7" require BUs deliberately far below 300. Read literally the criteria contradict each other. SC-008 phrases the band as an *estimate* ("estimated 300–800 per BU"), which supports treating it as the nominal range for ordinary BUs, not a hard invariant for every BU.
+
+**Provisional answer in effect (per CLAUDE.md §6.3):** the 300–800 band applies to the ordinary (non-engineered) BUs; the three engineered edge-case BUs (sub-4, single-team, org-of-7) are intentional exceptions demanded by criteria (b)/(c)/(d). Tests assert the 300–800 shape over the ordinary BUs only, and assert the whole-population invariants (exactly 23 BUs, 6 groups, 3 portfolios, total ≥10,000 people, ≥2,000 managers with ≥1 active report) over all BUs including the engineered ones. Population stays at exactly 23 BUs (3 engineered-small + 20 ordinary) to honour the literal "23 BUs" count.
+
+**Blocks:** nothing — synthetic Wave-0 data; a reversal (e.g. put the engineered small orgs in extra BUs beyond 23, or as sub-teams of larger BUs) is a generator retune + test update, both reviewed.
+**Status:** OPEN (provisional answer in effect)
