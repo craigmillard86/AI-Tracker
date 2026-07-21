@@ -5,12 +5,26 @@ epic: E1-foundations
 wave: 0
 fr: [FR-020, FR-021, FR-022, FR-023, FR-024, FR-050, FR-053]
 risk: L3                # trigger: directory-import writes to people/hierarchy + audit-log write paths
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-21T15:54:15Z, end: 2026-07-21T17:04:29Z, mins: 70}
   - {phase: qa, start: 2026-07-21T17:06:52Z, end: 2026-07-21T17:15:58Z, mins: 9}
-closure: null
+closure:
+  sha: 9425b36
+  files: [backend/src/Hap.Domain/Org/**, backend/src/Hap.Domain/Audit/**, backend/src/Hap.Infrastructure/{Directory,Audit,Persistence/Migrations}/**, backend/src/Hap.Api/AdminEndpoints.cs, backend/tests/**, docs/wiki/org-and-directory.md]
+  tests: "backend Domain 6 / Architecture 3 / Synth 41 / Api 39; PrivacyReporting Architecture 2 + Api 7 (append-only reflection + source-scan, one-audit-row, fail-closed rollback, DB-level UPDATE/DELETE + TRUNCATE rejection); migration #1 idempotent; verify.sh ALL GREEN"
+  risk: L3
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team]
+  date: 2026-07-21
+  g1_preconditions:
+    - "[PA] auth-gating of /api/admin/sync and /api/admin/overrides — currently unauthenticated (wave-0 tolerable, synthetic-only); AC added to HAP-4 (401 sweep) and HAP-5 (403/404 [PA] across all seven roles). MUST be in place before Gate G1."
+    - "Wire AuditLog.ActorPersonId (null in wave-0, no identity yet) in the identity story (HAP-4/5) so FR-050 'who' is captured."
+    - "Production DB app role MUST NOT be a superuser (red-team) AND MUST NOT own the audit_log table (QA): either can disable the append-only triggers (superuser via session_replication_role; owner via ALTER TABLE ... DISABLE TRIGGER). Separate the migration-owning role from the app's runtime-query role before G1/real data, else FR-053 is bypassable."
+  carry_forward:
+    - "HAP-5: management-chain walk must be cycle-safe (visited-set + depth-cap, no acyclicity assumption) — AC added; read-side backstop for multi-node cycles importable via a future non-synthetic adapter."
+    - "RoleGrant-endpoint story: 'every override/role-grant write carries an audit row' is convention-only (no RoleGrant write path yet); add a SaveChanges interceptor asserting the invariant when that endpoint lands."
+    - "L2 dependency story: MSB3277 EFCore.Relational 8.0.4 (via Npgsql 8.0.4) vs EFCore 8.0.8 version conflict — align in a dedicated dependency commit."
 ---
 ## Story
 As the platform team, we need the org hierarchy (person → team → BU → group → portfolio) imported from the directory port with a manual-override layer and an append-only audit log, so role scopes and every later feature stand on trustworthy org data.
