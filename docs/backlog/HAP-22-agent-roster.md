@@ -9,7 +9,7 @@ status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-21T11:30:39Z, end: 2026-07-21T11:38:33Z, mins: 8}
-closure: {sha: PENDING, files: 12, tests: "n/a — docs/agents only, no runtime surface; verify.sh not yet built (HAP-1)", risk: L2, panel: ["self-review — see closure note"], date: 2026-07-21}
+closure: {sha: 1de3f06, files: 12, tests: "n/a — docs/agents only, no runtime surface; verify.sh not yet built (HAP-1)", risk: L2, panel: ["self-review — see closure note"], date: 2026-07-21}
 ---
 ## Story
 As the platform owner, the review panels named in CLAUDE.md §7 exist as versioned project agents in `.claude/agents/`, so every story's panel is convened from repo-defined reviewers rather than ad-hoc prompts — and the contract names them explicitly.
