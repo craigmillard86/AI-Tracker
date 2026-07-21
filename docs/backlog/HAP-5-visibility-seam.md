@@ -5,12 +5,30 @@ epic: E1-foundations
 wave: 0
 fr: [FR-014, FR-025, FR-071]
 risk: L3                # trigger: role-scope/visibility predicates + N<4 suppression logic (the seam itself)
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-21T19:39:53Z, end: 2026-07-21T20:55:21Z, mins: 76}
   - {phase: qa, start: 2026-07-21T21:01:06Z, end: 2026-07-21T21:12:48Z, mins: 12}
-closure: null
+closure:
+  sha: cd4c1e0
+  files: [backend/src/Hap.Api/Authorization/**, backend/tests/Hap.Api.Tests/Authorization/**, backend/tests/Hap.Api.Tests/Identity/AdminGateAllRolesTests.cs, backend/tests/Hap.Architecture.Tests/SeamBoundaryTests.cs, docs/wiki/visibility-seam.md]
+  tests: "backend Api 174 (Authorization + boundary + [PA] matrix); Category=PrivacyReporting 98+5; suppression D2 set-based (multi-child differencing defeated); cycle-safe chain (visited-set + depth cap); fail-closed gateway; NO migration / NO DbSet / no new dep; verify.sh ALL GREEN"
+  risk: L3
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team]
+  rounds: 3
+  date: 2026-07-21
+  note: "L3 panel over 3 rounds. Round 1: Q-015 over-grant found (gateway authorised on the chain alone, never consulting RoleScope → above-BU leaders read individual scores org-wide). Ruled fix-now (Part 1: wire the role gate, no Q-014 needed) with the Q-014-bound fine cap deferred fail-closed (Part 2). Round 2: gross transitive over-grant closed. Round 3: red-team caught false-assurance in the record — an ungranted hierarchy Portfolio/Group Leader is classified Manager and CAN read their IMMEDIATE direct report (HAP-GRP-01→HAP-BUL-01, HAP-PF-01→HAP-GRP-01 ALLOWED); code correct (genuinely Q-014-bound), record corrected + behaviour pinned by a flip-when-Q-014-lands test. QA confirmed the residual is EXACTLY one-hop (not wider) and no differencing attack recovers a suppressed figure."
+  g1_preconditions:
+    - "OWNER RULING REQUIRED (Q-015): does an above-BU hierarchy leader (Portfolio/Group) read their IMMEDIATE direct report's individual score, or aggregates only? The seam currently ALLOWS the one-hop direct read (an ungranted hierarchy leader classifies as Manager). The G1 witness (HAP-12 V3 spot-checks) MUST show HAP-PF-01→HAP-GRP-01 and HAP-GRP-01→HAP-BUL-01 returning ALLOWED so the owner sees and rules. Pinned by OrgGraphRealDirectoryTests.PINNED_ungranted_above_BU_hierarchy_leader_CAN_read_immediate_direct_report_pending_Q014_G1 (flips to deny when Q-014's structural anchor lands + owner rules restrictive)."
+    - "HARD BLOCK ON HAP-8: HAP-8 MUST NOT wire a live cross-person individual-read endpoint until the Q-014/Q-015 BU-tier cap lands. HAP-8's self-only /api/me/assessment* is unaffected. (Recorded in HAP-8 Context.)"
+    - "Q-006 (contractor-manager): the RESTRICTIVE default (contractor ancestor excluded, reviews escalate) holds in the seam behind a DI-default config; G1 must not certify contractor-manager individual access until Q-006 is owner-ratified."
+  carry_forward:
+    - "HAP-8: relocate the Assessment/AssessmentScore types from Hap.Api.Authorization to Hap.Domain to register the DbSet without a layer inversion, and extend SeamBoundaryTests to the DbSet form + a namespace/EF-model-aware guard (QA noted the current guard is a lexical scan, evadable by obfuscated reflection — unreachable today, no DbSet)."
+    - "RoleGrant-assignment story: BuDelegate has no live grant-seeding path yet (the 'BU Lead sees their whole BU' row is code-correct but unreachable in practice); multi-BU BuDelegate under-grants (FirstOrDefault)."
+    - "Rollup story: restore the explicit root-node (parentN:null) suppression test lost when EvaluateNode was removed; add a serialisation guard so AggregateOutcome.Suppressed can't be emitted off the FR-071 wire shape."
+    - "HAP-8+ endpoints: keep the gateway deny Reason AUDIT-ONLY — map endpoint responses per the 403/404 existence-leak rule (a distinguishable 'not in org graph' reason is an existence oracle)."
+    - "G2: time-series / composition-change differencing over the suppression regime must be witnessed (out of scope for the pure evaluator)."
 ---
 ## Story
 As the platform, every read of assessment data must pass through one authorisation layer — management-chain resolution, role scoping, and small-group suppression with complement defense — so no query path can ever reach a score the caller isn't entitled to. This is the constitution's Wave-0 spike, hardened into production code.
