@@ -5,12 +5,26 @@ epic: E2-assessment
 wave: 1
 fr: [FR-002, FR-003, FR-004, FR-005, FR-006, FR-060]
 risk: L2                # trigger: cycle state machine
-status: qa
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-21T21:37:36Z, end: 2026-07-21T22:34:28Z, mins: 56}
   - {phase: qa, start: 2026-07-21T22:36:47Z, end: 2026-07-21T22:50:52Z, mins: 14}
-closure: null
+closure:
+  sha: 983dddc
+  files: [backend/src/Hap.Domain/Cycles/**, backend/src/Hap.Infrastructure/Cycles/**, backend/src/Hap.Infrastructure/Persistence/Migrations/20260721214132_AddCycleManagement*, backend/src/Hap.Api/CycleEndpoints.cs, backend/src/Hap.Api/AdminEndpoints.cs, backend/tests/**, docs/wiki/cycles-and-assessment.md]
+  tests: "backend 298 (Api 209 incl. cycle + QA adversarial); PrivacyReporting 122; migration #3 idempotent + chains behind #2; framework-lock DB trigger rejects UPDATE/DELETE/re-parent of a locked version's content (closes HAP-6 A6); verify.sh ALL GREEN"
+  risk: L2
+  panel: [hap-code-reviewer, hap-domain-specialist]
+  rounds: 2
+  date: 2026-07-21
+  note: "L2 panel over 2 rounds. Round-1 code-reviewer caught (and empirically proved) a re-parent bypass in the framework-lock trigger (UPDATE checked only NEW parent) — fixed to check OLD+NEW via TG_OP + a BEFORE DELETE guard, re-proven by both the reviewer and QA. Closes HAP-6's deferred A6 carry-forward (Cycle.Open() is Lock()'s first caller)."
+  carry_forward:
+    - "FR-054 framework-lock DB backstop is NOT complete for TRUNCATE (QA finding): the row-level BEFORE trigger rejects UPDATE/DELETE/re-parent but does NOT fire on TRUNCATE, and the app's `hap` role owns the framework tables (postgres bootstrap/owner), so it has TRUNCATE rights. Unreachable via any current HTTP path (nothing issues TRUNCATE outside test scaffolding). The next story that adds raw SQL near framework_versions/dimensions/level_descriptors — or a dedicated hardening pass — must add a BEFORE TRUNCATE statement-level trigger to all three (mirror HAP-3's audit_log_no_truncate) AND bracket TestSupport.ResetAsync's TRUNCATE of those tables in `SET session_replication_role='replica'` (the same coupling HAP-3 handled). Do NOT overstate the backstop as complete until this lands."
+    - "PlatformAdmin late-override does NOT check target.IsActive (QA finding): a Platform Admin can grant a late-override for a DEPARTED person, while a Manager cannot (round-1 IsActive check). Examined and consistent with AC5's literal 'Platform Admin (any person)' — recorded as an intentional asymmetry, not a defect. Candidate one-line hardening (deny override for an inactive subject even for admin) if the owner prefers; a departed person cannot submit anyway. Owner's call."
+    - "One-Open-per-framework is check-then-act with no DB constraint — a concurrency window under two concurrent admins (single-admin local build makes it low-risk); a future DB-level guard is complicated by the version→framework join (a simple partial unique index won't do). Noted in CycleService.OpenAsync."
+    - "Q-016 (BU↔framework mapping): data-model.md models no BU↔framework junction, so OpenAsync invites every onboarded BU — a HARD BLOCKER for any second-framework story (would over-invite every BU to every framework's cycle). See QUESTIONS.md Q-016."
+    - "Q-017a (submission lock) + Q-017 CloseAsync handoff: HAP-8/HAP-9 must consult Cycle.AllowsSubmission for post-close submission rejection; HAP-10 must hook auto-adoption/snapshots/suppression into CycleService.CloseAsync (currently a bare transition). See QUESTIONS.md Q-017. Q-017b: the BU-onboard mutation must get an AuditLog row before its flag feeds any reconciled participation/Harris figure (L3 obligation on the Wave-2 consumer)."
 ---
 ## Story
 As a Platform Admin, I can open one global monthly cycle per framework whose invitations are derived automatically from the onboarded org (contractors excluded), locked at close with a manager-or-admin late override, so participation is mandatory, mechanical, and auditable.

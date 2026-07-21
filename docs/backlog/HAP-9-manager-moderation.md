@@ -19,6 +19,7 @@ As a Manager, I review each direct report's self-scores and evidence side by sid
 - Mockup: `docs/design/mockups/assessment-moderation.html` — binding incl. the **Δ≥2 forced-comment state** and carry-forward defaults shown. Components (A8): **DivergenceFlag**, **ComparisonRow**; A4 tables/forms.
 - Files: seam gateway + audit hook in `backend/src/Hap.Api/Authorization/`, manager endpoints, `app/src/screens/assessment-moderation/**`, `app/src/components/{DivergenceFlag,ComparisonRow}/**`. Individual result view (`GET /api/me/assessment/result`) + its screen section per FR-012.
 - No migration (tables exist from HAP-8).
+- **HAP-7 handoff — the post-close submission lock (Q-017a, binding):** a manager's moderation write is a submission-class write. It MUST consult `Cycle.AllowsSubmission(hasLateOverride)` (+ `CycleService.HasLateOverrideAsync`) and reject a post-close moderation (423/409) unless a late override exists — the same lock the self-assessment path uses (HAP-8). Post-close rejection exists only if every submission-class write path checks the primitive.
 - Blocked by: HAP-8
 - Parallelisable: no
 
