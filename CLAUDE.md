@@ -33,7 +33,7 @@ HAP/
 │   └── synth/                 ← deterministic synthetic data generators (seeded)
 └── docs/
     ├── spec/                  ← root specification (verbatim; feature specs live in specs/)
-    ├── design/DESIGN.md       ← binding design system (extracted tokens + app addendum; §8.2)
+    ├── design/                ← binding design system: DESIGN.md (tokens + app addendum) + mockups/ (screen references; §8.2)
     ├── backlog/               ← THE BACKLOG: one file per story + generated board.md
     ├── decisions/             ← append-only decision records + QUESTIONS.md
     ├── delivery/              ← wave plan
@@ -111,7 +111,7 @@ Commonly misclassified: a "one-line" WHERE-clause change in an assessment query 
 ## 8. Phase 2 — Dev loop
 
 1. TDD by default: failing test → implementation → green. Tests written now are Dev work; attribute honestly.
-2. UI work follows `docs/design/DESIGN.md` — components, screens, and copy conform to it; if a story's acceptance criteria conflict with it, that's a QUESTIONS.md item, not a judgment call. Changing DESIGN.md itself is a reviewed commit (L0 minimum), never a drive-by edit inside a feature branch.
+2. UI work follows `docs/design/DESIGN.md` (tokens, rules) and the screen mockups in `docs/design/mockups/` (see its `index.md` — layout, information architecture, and shown states are binding; exact pixels are not). If a story's acceptance criteria conflict with either, that's a QUESTIONS.md item, not a judgment call. Changing DESIGN.md or a mockup is a reviewed commit (L0 minimum), never a drive-by edit inside a feature branch.
 3. Framework content, Harris form structure, taxonomies, hierarchy mappings = data, not code. Writing a dimension name in C#/TS means it belongs in docs/frameworks/ or a seeded table instead.
 4. All assessment reads go through the authorisation layer. Need a query the seam doesn't support? Extend the seam (L3) — never go around it.
 5. Run ./scripts/verify.sh — the gate of record: builds both stacks warnings-as-errors, runs all tests (backend, frontend, lint, typecheck) against a disposable dockerised Postgres, compiles migrations idempotently, and always runs the PrivacyReporting regression suite. Requires only Docker + local toolchains. Green exit or the story is not reviewable. Never edit verify.sh to make it pass (verify.sh changes are L2 in their own right).

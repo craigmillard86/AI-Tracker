@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440">
+<title>Meridian Health Systems · HAP</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#002c36;--teal:#008099;--teal-d:#006377;--lteal:#67bfd0;
+  --ink:#0e1b1f;--slate:#425466;--muted:#5b6b70;--border:#d9e0e3;--line:#eef1f2;
+  --bg:#f7f8f9;--ice:#e0eaf3;--white:#fff;
+  --l0:#D5DDE3;--l1:#67bfd0;--l2:#008099;--l3:#002c36;
+  --green:#1F7A4D;--amber:#B45309;--red:#B3362B;
+  --green-t:#E3F2EA;--amber-t:#FDF0E0;--red-t:#FBE9E7;
+  --shadow:0 10px 20px rgba(37,82,95,.08);
+}
+html{font-size:15px}
+body{font-family:'Inter Tight',system-ui,sans-serif;font-size:15px;line-height:22px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:var(--teal);text-decoration:none}
+a:hover{color:var(--teal-d);text-decoration:underline}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px;border-radius:4px}
+h1,h2,h3{font-weight:700}
+
+/* frame */
+.app{display:grid;grid-template-columns:248px 1fr;grid-template-rows:56px 1fr;min-height:100vh;grid-template-areas:"brand top" "nav main"}
+.topbar{grid-area:top;background:var(--navy);display:flex;align-items:center;gap:20px;padding:0 24px;color:#cfe0e4;border-bottom:1px solid #013640}
+.brandbar{grid-area:brand;background:var(--navy);display:flex;align-items:center;gap:10px;padding:0 20px;color:#fff;border-bottom:1px solid #013640;border-right:1px solid #013640}
+.brandbar .logo{width:30px;height:30px;border-radius:8px;background:var(--teal);display:flex;align-items:center;justify-content:center;font-family:'Montserrat';font-weight:700;font-size:14px;color:#fff}
+.brandbar .wm{font-family:'Montserrat';font-weight:700;font-size:17px;letter-spacing:.5px}
+.brandbar .wm small{display:block;font-family:'Inter Tight';font-weight:500;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7fa6ae}
+.ctx{display:flex;align-items:center;gap:8px;font-size:13px;color:#9fc0c7;background:#013b47;padding:6px 14px;border-radius:50px}
+.ctx b{color:#e6f1f3;font-weight:600}
+.topbar .spacer{flex:1}
+.userchip{display:flex;align-items:center;gap:10px;font-size:13px;color:#cfe0e4}
+.userchip .av{width:32px;height:32px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.userchip b{color:#fff;font-weight:600;display:block;line-height:15px}
+.userchip small{color:#7fa6ae;font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+.topsearch{background:#013b47;border:1px solid #024452;color:#cfe0e4;border-radius:20px;padding:7px 14px;font-size:13px;width:240px;font-family:inherit}
+.topsearch::placeholder{color:#6f979f}
+
+nav.side{grid-area:nav;background:var(--navy);padding:16px 12px;color:#b9d0d5;overflow:auto}
+nav.side .grp{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#6f979f;padding:14px 12px 6px;font-weight:600}
+nav.side a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#c8dbdf;font-size:14px;margin-bottom:2px}
+nav.side a:hover{background:#013b47;text-decoration:none;color:#fff}
+nav.side a.active{background:var(--teal);color:#fff;font-weight:600}
+nav.side a .dot{width:6px;height:6px;border-radius:50%;background:#3f7a86}
+nav.side a.active .dot{background:#fff}
+
+main.content{grid-area:main;padding:28px 36px 60px;max-width:1440px;min-width:1244px}
+.pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:24px}
+.crumb{font-size:13px;color:var(--muted);margin-bottom:8px}
+.crumb a{color:var(--muted)}
+h1.title{font-family:'Montserrat';font-weight:700;font-size:30px;line-height:38px;color:var(--ink)}
+.subtitle{color:var(--slate);font-size:15px;margin-top:6px}
+
+/* buttons */
+.btn{font-family:'Inter Tight';font-weight:700;font-size:14px;border-radius:50px;padding:0 22px;height:40px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;border:1.5px solid transparent;white-space:nowrap}
+.btn-primary{background:var(--teal);color:#fff}
+.btn-primary:hover{background:var(--teal-d)}
+.btn-secondary{background:#fff;color:var(--teal);border-color:var(--teal)}
+.btn-secondary:hover{background:#f0f8fa}
+.btn-ghost{background:transparent;color:var(--slate);border-color:transparent}
+.btn-ghost:hover{background:var(--line)}
+.btn-danger{background:var(--red);color:#fff}
+.btn.sm{height:32px;padding:0 16px;font-size:13px}
+
+/* labels */
+.lbl{font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+
+/* cards */
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:20px 22px}
+.card h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.card .hint{font-size:13px;color:var(--muted)}
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.grid{display:grid;gap:20px}
+
+/* KPI */
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:18px 20px}
+.kpi .lbl{margin-bottom:10px}
+.kpi .big{font-size:34px;font-weight:700;line-height:1;font-family:'Inter Tight'}
+.kpi .sub{font-size:13px;color:var(--muted);margin-top:8px}
+.kpi.alert{border-color:#f0cfc9;background:var(--red-t)}
+.kpi.alert .big{color:var(--red)}
+
+/* level chips */
+.lvl{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:24px;padding:0 9px;border-radius:50px;font-weight:600;font-size:13px;letter-spacing:.3px}
+.lvl-0{background:var(--l0);color:#1e2a30}
+.lvl-1{background:var(--l1);color:#002c36}
+.lvl-2{background:var(--l2);color:#fff}
+.lvl-3{background:var(--l3);color:#fff}
+.lvl.big{min-width:56px;height:44px;font-size:22px;border-radius:12px}
+
+/* RAG */
+.rag{display:inline-flex;align-items:center;gap:7px;padding:3px 11px;border-radius:50px;font-size:13px;font-weight:600;white-space:nowrap}
+.rag::before{content:"";width:8px;height:8px;border-radius:50%;flex:none}
+.rag-green{background:var(--green-t);color:var(--green)}.rag-green::before{background:var(--green)}
+.rag-amber{background:var(--amber-t);color:var(--amber)}.rag-amber::before{background:var(--amber)}
+.rag-red{background:var(--red-t);color:var(--red)}.rag-red::before{background:var(--red)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:50px;font-size:12px;font-weight:600;letter-spacing:.4px;background:var(--ice);color:var(--slate)}
+.chip.stale{background:var(--amber-t);color:var(--amber)}
+.tag{font-size:12px;font-weight:600;color:var(--slate);background:var(--bg);border:1px solid var(--border);padding:2px 9px;border-radius:50px}
+
+/* tables */
+table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+table.tbl thead th{font-size:12px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1.5px solid var(--border);background:var(--bg);position:sticky;top:0}
+table.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.tbl tbody tr:hover td{background:#f7fbfc}
+table.tbl td.num,table.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.tbl td.ctr,table.tbl th.ctr{text-align:center}
+.rowflag{box-shadow:inset 3px 0 0 var(--amber)}
+.muted{color:var(--muted)}
+.trend-up{color:var(--green);font-weight:600}
+.trend-down{color:var(--red);font-weight:600}
+.trend-flat{color:var(--muted);font-weight:600}
+
+/* bars */
+.dimbar{height:10px;border-radius:50px;background:var(--ice);overflow:hidden}
+.dimbar > i{display:block;height:100%;background:var(--teal);border-radius:50px}
+
+/* forms */
+label.field{display:block;margin-bottom:16px}
+label.field > span{display:block;font-size:13px;font-weight:500;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input.inp,select.inp,textarea.inp{width:100%;font-family:inherit;font-size:15px;color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:9px 12px;background:#fff}
+textarea.inp{resize:vertical;min-height:64px}
+input.inp:focus,select.inp:focus,textarea.inp:focus{outline:3px solid var(--teal);outline-offset:0;border-color:var(--teal)}
+.help{font-size:12px;color:var(--muted);margin-top:5px}
+fieldset{border:0}
+.formgroup{border-top:1px solid var(--line);padding-top:22px;margin-top:22px}
+.formgroup:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.formgroup > legend, .grouptitle{font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:14px;padding:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+
+/* selectable level cards */
+.levset{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.levcard{border:1.5px solid var(--border);border-radius:10px;padding:14px;background:#fff;cursor:pointer;position:relative;display:block}
+.levcard:hover{border-color:var(--lteal)}
+.levcard.selected{border-color:var(--teal);box-shadow:0 0 0 2px rgba(0,128,153,.18)}
+.levcard.prev{border-style:dashed}
+.levcard .lhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.levcard .lname{font-size:12px;font-weight:600;letter-spacing:.4px;color:var(--slate)}
+.levcard .ldesc{font-size:13px;line-height:19px;color:var(--slate)}
+.levcard .pill-prev{position:absolute;top:-9px;right:10px;font-size:10px;background:var(--ice);color:var(--slate);padding:2px 8px;border-radius:50px;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+.levcard input{position:absolute;opacity:0}
+
+.progress{height:8px;border-radius:50px;background:var(--ice);overflow:hidden;flex:1}
+.progress > i{display:block;height:100%;background:var(--teal)}
+
+.note{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:14px;color:var(--slate)}
+.callout{border-left:none;border:1px solid #f0cfc9;background:var(--red-t);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--red)}
+.callout.info{border-color:#bfe0e6;background:#eaf6f8;color:var(--teal-d)}
+.divider-cell{background:var(--amber-t) !important}
+.hl{background:var(--amber-t)}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font-size:22px;font-weight:700}
+.stat small{font-size:12px;color:var(--muted);letter-spacing:.4px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.legend .sw{width:14px;height:14px;border-radius:4px;display:inline-block}
+</style></head>
+<body>
+<div class="app">
+  <div class="brandbar"><div class="logo">H</div><div class="wm">HAP<small>AI Adoption Platform</small></div></div>
+  <header class="topbar">
+    <div class="ctx">Framework <b>AI in the SDLC v1</b> · Cycle <b>FY27-M07 (Jul 2026)</b></div>
+    <input class="topsearch" type="search" placeholder="Search initiatives, BUs, people…" aria-label="Search">
+    <div class="spacer"></div>
+    <div class="userchip"><div><b>Priya Anand</b><small>BU Lead (EVP) · Meridian</small></div><div class="av">PA</div></div>
+  </header>
+  <nav class="side" aria-label="Primary"><div class="grp">Maturity assessment</div><a href="dashboard-bu.html" class="active" aria-current="page"><span class="dot"></span>BU Dashboard</a><a href="heatmap-group.html"><span class="dot"></span>Group Heatmap</a><a href="assessment-self.html"><span class="dot"></span>Self-Assessment</a><a href="assessment-moderation.html"><span class="dot"></span>Manager Review</a><div class="grp">Initiative register</div><a href="register-list.html"><span class="dot"></span>Initiative Register</a><div class="grp">Harris reporting</div><a href="harris-submission.html"><span class="dot"></span>Harris Submission</a><a href="bu-forms.html"><span class="dot"></span>BU Reporting Forms</a></nav>
+  <main class="content">
+    <div class="pagehead">
+      <div><div class="crumb">Maturity assessment</div><h1 class="title">Meridian Health Systems</h1><div class="subtitle">BU maturity & initiative overview · Cycle FY27-M07 (July 2026)</div></div>
+      <div style="display:flex;gap:10px;flex:none"><a class="btn btn-secondary" href="heatmap-group.html">Compare to group</a><a class="btn btn-primary" href="assessment-self.html">Start July self-assessment</a></div>
+    </div>
+    
+<div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+  <div class="kpi"><div class="lbl">BU Floor Level</div><div style="display:flex;align-items:center;gap:14px"><span class="lvl big lvl-1">L1</span><div><div style="font-weight:700;font-size:15px">AI Assisted</div><div class="sub" style="margin:0">Weakest-dimension floor</div></div></div><div class="sub">78% of team at L1+ · 22% still at L0 (<em>Value measured</em>)</div></div>
+  <div class="kpi"><div class="lbl">Mean Maturity</div><div style="display:flex;align-items:flex-end;gap:12px"><div class="big">1.6</div><svg width="118" height="32" viewBox="0 0 118 32" aria-hidden="true"><polyline fill="none" stroke="#008099" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="3.0,29.0 25.4,16.2 47.8,13.2 70.2,24.8 92.6,28.6 115.0,3.0"/><circle cx="115.0" cy="3.0" r="2.6" fill="#008099"/></svg></div><div class="sub"><span class="trend-up">▲ +0.2</span> vs Jun · continuous 0–3 mean</div></div>
+  <div class="kpi"><div class="lbl">Assessment Completion</div><div class="big">84%</div><div class="sub">38 of 45 in-scope submitted · <a href="assessment-self.html">7 outstanding</a></div></div>
+  <div class="kpi alert"><div class="lbl">Overdue Weekly Updates</div><div class="big">3</div><div class="sub">initiatives not updated in &gt;7 days — hurts data-quality score</div></div>
+</div>
+<div class="card">
+  <div class="cardhead"><div><h2>Maturity by dimension</h2><div class="hint">Mean moderated score across the BU (0–3), with initiatives tagged to each dimension</div></div>
+  <div class="legend"><span class="k"><span class="sw" style="background:var(--l0)"></span>L0</span><span class="k"><span class="sw" style="background:var(--l1)"></span>L1</span><span class="k"><span class="sw" style="background:var(--l2)"></span>L2</span><span class="k"><span class="sw" style="background:var(--l3)"></span>L3</span></div></div>
+  <table class="tbl"><thead><tr><th style="width:230px">Dimension</th><th>Mean score</th><th class="num" style="width:70px">Value</th><th class="ctr" style="width:120px">Floor level</th><th class="num" style="width:130px">Initiatives</th></tr></thead><tbody>
+  <tr><td><b>How AI is leveraged</b></td><td><div class="dimbar"><i style="width:70%"></i></div></td><td class="num">2.1</td><td class="ctr"><span class="lvl lvl-2" title="Level 2 — AI Directed">L2</span></td><td class="num">3</td></tr><tr><td><b>Examples / Usage</b></td><td><div class="dimbar"><i style="width:60%"></i></div></td><td class="num">1.8</td><td class="ctr"><span class="lvl lvl-2" title="Level 2 — AI Directed">L2</span></td><td class="num">2</td></tr><tr><td><b>Work unit</b></td><td><div class="dimbar"><i style="width:47%"></i></div></td><td class="num">1.4</td><td class="ctr"><span class="lvl lvl-1" title="Level 1 — AI Assisted">L1</span></td><td class="num">1</td></tr><tr><td><b>SDLC process</b></td><td><div class="dimbar"><i style="width:43%"></i></div></td><td class="num">1.3</td><td class="ctr"><span class="lvl lvl-1" title="Level 1 — AI Assisted">L1</span></td><td class="num">2</td></tr><tr><td><b>Timing</b></td><td><div class="dimbar"><i style="width:57%"></i></div></td><td class="num">1.7</td><td class="ctr"><span class="lvl lvl-2" title="Level 2 — AI Directed">L2</span></td><td class="num">1</td></tr><tr class="rowflag"><td><b>Value measured</b></td><td><div class="dimbar"><i style="width:40%"></i></div></td><td class="num">1.2</td><td class="ctr"><span class="lvl lvl-1" title="Level 1 — AI Assisted">L1</span></td><td class="num"><span class="chip stale">0 — gap</span></td></tr><tr><td><b>Impact</b></td><td><div class="dimbar"><i style="width:63%"></i></div></td><td class="num">1.9</td><td class="ctr"><span class="lvl lvl-2" title="Level 2 — AI Directed">L2</span></td><td class="num">2</td></tr>
+  </tbody></table>
+  <div class="callout" style="margin-top:14px">⚠ <b>Value measured</b> is the weakest dimension (mean 1.2) with <b>zero</b> initiatives tagged to advance it — the BU's floor level cannot rise past L1 until this is addressed.</div>
+</div>
+<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:20px">
+  <div class="card"><div class="cardhead"><h2>Initiative pipeline</h2><a href="register-list.html">View register →</a></div>
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="note" style="text-align:center"><div class="big" style="font-size:30px;font-weight:700">8</div><div style="font-weight:600;font-size:14px;margin-top:2px">Ideation</div><div class="hint" style="margin-top:2px">Idea + Evaluation</div></div><div class="note" style="text-align:center"><div class="big" style="font-size:30px;font-weight:700">4</div><div style="font-weight:600;font-size:14px;margin-top:2px">Development</div><div class="hint" style="margin-top:2px">Pilot</div></div><div class="note" style="text-align:center"><div class="big" style="font-size:30px;font-weight:700">3</div><div style="font-weight:600;font-size:14px;margin-top:2px">Production</div><div class="hint" style="margin-top:2px">Production + Scaled</div></div><div class="note" style="text-align:center"><div class="big" style="font-size:30px;font-weight:700">2</div><div style="font-weight:600;font-size:14px;margin-top:2px">Stopped</div><div class="hint" style="margin-top:2px">Retired</div></div>
+    </div>
+    <div class="hint" style="margin-top:14px">17 active initiatives · Harris stage mapping applied. 2 retired shown as “Ideas Tried but Stopped”.</div>
+  </div>
+  <div class="card"><div class="cardhead"><h2>Overdue weekly updates</h2><span class="chip stale">3 flagged</span></div>
+    <table class="tbl"><thead><tr><th>Initiative</th><th>Owner</th><th class="num">Overdue</th><th>Last RAG</th></tr></thead><tbody>
+    <tr><td><a href="register-detail.html">Claims Triage Copilot</a></td><td>R. Okonjo</td><td class="num"><b style="color:var(--red)">11 days</b></td><td><span class="rag rag-red">Off Track</span></td></tr><tr><td><a href="register-detail.html">Care-Plan Summariser</a></td><td>T. Bianchi</td><td class="num"><b style="color:var(--red)">9 days</b></td><td><span class="rag rag-amber">At Risk</span></td></tr><tr><td><a href="register-detail.html">Referral Intake Agent</a></td><td>M. Delacroix</td><td class="num"><b style="color:var(--red)">8 days</b></td><td><span class="rag rag-amber">At Risk</span></td></tr>
+    </tbody></table>
+    <div class="hint" style="margin-top:12px">Escalates to BU Lead after two missed weeks (§4.2).</div>
+  </div>
+</div>
+  </main>
+</div>
+</body></html>

@@ -351,6 +351,10 @@ Tracked in `docs/decisions/QUESTIONS.md` (Q-001..Q-003) per CLAUDE.md §6.3; sum
 
 ---
 
+## Design References
+
+Binding UI references for the user stories in this spec: design system `docs/design/DESIGN.md` and screen mockups `docs/design/mockups/` (see its `index.md` for the screen ↔ spec-area map). Layout, information architecture, and the non-happy states shown (suppressed aggregates, divergence, overdue updates, incomplete assessments) are binding; exact pixels are not. Note: `heatmap-group.html` mocks the Phase 2 heatmap/league table (FR-042, out of scope here) — it stands as forward reference only.
+
 ## Dependencies & Constraints
 
 - **Governance**: This feature is a signatory component of the HIG AI Adoption Platform and implements Article VI of the constitution (Privacy and Reporting are the Safeguarding Seam). All code touching authorization, visibility, and Harris submission generation is L3 (requiring code-reviewer + domain specialist + red-team review per CLAUDE.md §7).

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440">
+<title>Claims Triage Copilot · HAP</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#002c36;--teal:#008099;--teal-d:#006377;--lteal:#67bfd0;
+  --ink:#0e1b1f;--slate:#425466;--muted:#5b6b70;--border:#d9e0e3;--line:#eef1f2;
+  --bg:#f7f8f9;--ice:#e0eaf3;--white:#fff;
+  --l0:#D5DDE3;--l1:#67bfd0;--l2:#008099;--l3:#002c36;
+  --green:#1F7A4D;--amber:#B45309;--red:#B3362B;
+  --green-t:#E3F2EA;--amber-t:#FDF0E0;--red-t:#FBE9E7;
+  --shadow:0 10px 20px rgba(37,82,95,.08);
+}
+html{font-size:15px}
+body{font-family:'Inter Tight',system-ui,sans-serif;font-size:15px;line-height:22px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:var(--teal);text-decoration:none}
+a:hover{color:var(--teal-d);text-decoration:underline}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px;border-radius:4px}
+h1,h2,h3{font-weight:700}
+
+/* frame */
+.app{display:grid;grid-template-columns:248px 1fr;grid-template-rows:56px 1fr;min-height:100vh;grid-template-areas:"brand top" "nav main"}
+.topbar{grid-area:top;background:var(--navy);display:flex;align-items:center;gap:20px;padding:0 24px;color:#cfe0e4;border-bottom:1px solid #013640}
+.brandbar{grid-area:brand;background:var(--navy);display:flex;align-items:center;gap:10px;padding:0 20px;color:#fff;border-bottom:1px solid #013640;border-right:1px solid #013640}
+.brandbar .logo{width:30px;height:30px;border-radius:8px;background:var(--teal);display:flex;align-items:center;justify-content:center;font-family:'Montserrat';font-weight:700;font-size:14px;color:#fff}
+.brandbar .wm{font-family:'Montserrat';font-weight:700;font-size:17px;letter-spacing:.5px}
+.brandbar .wm small{display:block;font-family:'Inter Tight';font-weight:500;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7fa6ae}
+.ctx{display:flex;align-items:center;gap:8px;font-size:13px;color:#9fc0c7;background:#013b47;padding:6px 14px;border-radius:50px}
+.ctx b{color:#e6f1f3;font-weight:600}
+.topbar .spacer{flex:1}
+.userchip{display:flex;align-items:center;gap:10px;font-size:13px;color:#cfe0e4}
+.userchip .av{width:32px;height:32px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.userchip b{color:#fff;font-weight:600;display:block;line-height:15px}
+.userchip small{color:#7fa6ae;font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+.topsearch{background:#013b47;border:1px solid #024452;color:#cfe0e4;border-radius:20px;padding:7px 14px;font-size:13px;width:240px;font-family:inherit}
+.topsearch::placeholder{color:#6f979f}
+
+nav.side{grid-area:nav;background:var(--navy);padding:16px 12px;color:#b9d0d5;overflow:auto}
+nav.side .grp{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#6f979f;padding:14px 12px 6px;font-weight:600}
+nav.side a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#c8dbdf;font-size:14px;margin-bottom:2px}
+nav.side a:hover{background:#013b47;text-decoration:none;color:#fff}
+nav.side a.active{background:var(--teal);color:#fff;font-weight:600}
+nav.side a .dot{width:6px;height:6px;border-radius:50%;background:#3f7a86}
+nav.side a.active .dot{background:#fff}
+
+main.content{grid-area:main;padding:28px 36px 60px;max-width:1440px;min-width:1244px}
+.pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:24px}
+.crumb{font-size:13px;color:var(--muted);margin-bottom:8px}
+.crumb a{color:var(--muted)}
+h1.title{font-family:'Montserrat';font-weight:700;font-size:30px;line-height:38px;color:var(--ink)}
+.subtitle{color:var(--slate);font-size:15px;margin-top:6px}
+
+/* buttons */
+.btn{font-family:'Inter Tight';font-weight:700;font-size:14px;border-radius:50px;padding:0 22px;height:40px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;border:1.5px solid transparent;white-space:nowrap}
+.btn-primary{background:var(--teal);color:#fff}
+.btn-primary:hover{background:var(--teal-d)}
+.btn-secondary{background:#fff;color:var(--teal);border-color:var(--teal)}
+.btn-secondary:hover{background:#f0f8fa}
+.btn-ghost{background:transparent;color:var(--slate);border-color:transparent}
+.btn-ghost:hover{background:var(--line)}
+.btn-danger{background:var(--red);color:#fff}
+.btn.sm{height:32px;padding:0 16px;font-size:13px}
+
+/* labels */
+.lbl{font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+
+/* cards */
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:20px 22px}
+.card h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.card .hint{font-size:13px;color:var(--muted)}
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.grid{display:grid;gap:20px}
+
+/* KPI */
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:18px 20px}
+.kpi .lbl{margin-bottom:10px}
+.kpi .big{font-size:34px;font-weight:700;line-height:1;font-family:'Inter Tight'}
+.kpi .sub{font-size:13px;color:var(--muted);margin-top:8px}
+.kpi.alert{border-color:#f0cfc9;background:var(--red-t)}
+.kpi.alert .big{color:var(--red)}
+
+/* level chips */
+.lvl{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:24px;padding:0 9px;border-radius:50px;font-weight:600;font-size:13px;letter-spacing:.3px}
+.lvl-0{background:var(--l0);color:#1e2a30}
+.lvl-1{background:var(--l1);color:#002c36}
+.lvl-2{background:var(--l2);color:#fff}
+.lvl-3{background:var(--l3);color:#fff}
+.lvl.big{min-width:56px;height:44px;font-size:22px;border-radius:12px}
+
+/* RAG */
+.rag{display:inline-flex;align-items:center;gap:7px;padding:3px 11px;border-radius:50px;font-size:13px;font-weight:600;white-space:nowrap}
+.rag::before{content:"";width:8px;height:8px;border-radius:50%;flex:none}
+.rag-green{background:var(--green-t);color:var(--green)}.rag-green::before{background:var(--green)}
+.rag-amber{background:var(--amber-t);color:var(--amber)}.rag-amber::before{background:var(--amber)}
+.rag-red{background:var(--red-t);color:var(--red)}.rag-red::before{background:var(--red)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:50px;font-size:12px;font-weight:600;letter-spacing:.4px;background:var(--ice);color:var(--slate)}
+.chip.stale{background:var(--amber-t);color:var(--amber)}
+.tag{font-size:12px;font-weight:600;color:var(--slate);background:var(--bg);border:1px solid var(--border);padding:2px 9px;border-radius:50px}
+
+/* tables */
+table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+table.tbl thead th{font-size:12px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1.5px solid var(--border);background:var(--bg);position:sticky;top:0}
+table.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.tbl tbody tr:hover td{background:#f7fbfc}
+table.tbl td.num,table.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.tbl td.ctr,table.tbl th.ctr{text-align:center}
+.rowflag{box-shadow:inset 3px 0 0 var(--amber)}
+.muted{color:var(--muted)}
+.trend-up{color:var(--green);font-weight:600}
+.trend-down{color:var(--red);font-weight:600}
+.trend-flat{color:var(--muted);font-weight:600}
+
+/* bars */
+.dimbar{height:10px;border-radius:50px;background:var(--ice);overflow:hidden}
+.dimbar > i{display:block;height:100%;background:var(--teal);border-radius:50px}
+
+/* forms */
+label.field{display:block;margin-bottom:16px}
+label.field > span{display:block;font-size:13px;font-weight:500;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input.inp,select.inp,textarea.inp{width:100%;font-family:inherit;font-size:15px;color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:9px 12px;background:#fff}
+textarea.inp{resize:vertical;min-height:64px}
+input.inp:focus,select.inp:focus,textarea.inp:focus{outline:3px solid var(--teal);outline-offset:0;border-color:var(--teal)}
+.help{font-size:12px;color:var(--muted);margin-top:5px}
+fieldset{border:0}
+.formgroup{border-top:1px solid var(--line);padding-top:22px;margin-top:22px}
+.formgroup:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.formgroup > legend, .grouptitle{font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:14px;padding:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+
+/* selectable level cards */
+.levset{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.levcard{border:1.5px solid var(--border);border-radius:10px;padding:14px;background:#fff;cursor:pointer;position:relative;display:block}
+.levcard:hover{border-color:var(--lteal)}
+.levcard.selected{border-color:var(--teal);box-shadow:0 0 0 2px rgba(0,128,153,.18)}
+.levcard.prev{border-style:dashed}
+.levcard .lhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.levcard .lname{font-size:12px;font-weight:600;letter-spacing:.4px;color:var(--slate)}
+.levcard .ldesc{font-size:13px;line-height:19px;color:var(--slate)}
+.levcard .pill-prev{position:absolute;top:-9px;right:10px;font-size:10px;background:var(--ice);color:var(--slate);padding:2px 8px;border-radius:50px;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+.levcard input{position:absolute;opacity:0}
+
+.progress{height:8px;border-radius:50px;background:var(--ice);overflow:hidden;flex:1}
+.progress > i{display:block;height:100%;background:var(--teal)}
+
+.note{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:14px;color:var(--slate)}
+.callout{border-left:none;border:1px solid #f0cfc9;background:var(--red-t);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--red)}
+.callout.info{border-color:#bfe0e6;background:#eaf6f8;color:var(--teal-d)}
+.divider-cell{background:var(--amber-t) !important}
+.hl{background:var(--amber-t)}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font-size:22px;font-weight:700}
+.stat small{font-size:12px;color:var(--muted);letter-spacing:.4px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.legend .sw{width:14px;height:14px;border-radius:4px;display:inline-block}
+</style></head>
+<body>
+<div class="app">
+  <div class="brandbar"><div class="logo">H</div><div class="wm">HAP<small>AI Adoption Platform</small></div></div>
+  <header class="topbar">
+    <div class="ctx">Framework <b>AI in the SDLC v1</b> · Cycle <b>FY27-M07 (Jul 2026)</b></div>
+    <input class="topsearch" type="search" placeholder="Search initiatives, BUs, people…" aria-label="Search">
+    <div class="spacer"></div>
+    <div class="userchip"><div><b>Priya Anand</b><small>BU Lead (EVP) · Meridian</small></div><div class="av">PA</div></div>
+  </header>
+  <nav class="side" aria-label="Primary"><div class="grp">Maturity assessment</div><a href="dashboard-bu.html"><span class="dot"></span>BU Dashboard</a><a href="heatmap-group.html"><span class="dot"></span>Group Heatmap</a><a href="assessment-self.html"><span class="dot"></span>Self-Assessment</a><a href="assessment-moderation.html"><span class="dot"></span>Manager Review</a><div class="grp">Initiative register</div><a href="register-list.html" class="active" aria-current="page"><span class="dot"></span>Initiative Register</a><div class="grp">Harris reporting</div><a href="harris-submission.html"><span class="dot"></span>Harris Submission</a><a href="bu-forms.html"><span class="dot"></span>BU Reporting Forms</a></nav>
+  <main class="content">
+    <div class="pagehead">
+      <div><div class="crumb"><a href="register-list.html">Initiative register</a> → Detail</div><h1 class="title">Claims Triage Copilot</h1><div class="subtitle">Full initiative record · Halcyon Insurance</div></div>
+      <div style="display:flex;gap:10px;flex:none"><a class="btn btn-secondary" href="register-list.html">Back to register</a><button class="btn btn-primary">Edit initiative</button></div>
+    </div>
+    
+<div class="grid" style="grid-template-columns:1fr 340px;align-items:start;gap:24px">
+  <div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="cardhead" style="align-items:flex-start"><div><h2 style="font-size:22px">Claims Triage Copilot</h2><div class="hint">Halcyon Insurance · Custom Agent deployed at customers · registered 12 Nov 2025</div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="lvl lvl-2">L2</span><span class="rag rag-red">Off Track</span><span class="chip stale">stale · 11d</span></div></div>
+      <div class="two" style="gap:0 32px">
+        <div><div class="lbl" style="margin-bottom:4px">Sponsor</div><p style="margin-bottom:14px">Halcyon EVP, Claims</p><div class="lbl" style="margin-bottom:4px">Owner (delivery)</div><p style="margin-bottom:14px">R. Okonjo</p><div class="lbl" style="margin-bottom:4px">Dimensions advanced</div><p><span class="tag">Examples / Usage</span> <span class="tag">Work unit</span> <span class="tag">Value measured</span></p></div>
+        <div><div class="lbl" style="margin-bottom:4px">Technology</div><p style="margin-bottom:14px">Claude (Azure) · self-hosted embeddings · vendor: internal</p><div class="lbl" style="margin-bottom:4px">Customers in production</div><p style="margin-bottom:14px"><b>14</b> unique</p><div class="lbl" style="margin-bottom:4px">Description</div><p class="muted" style="font-size:14px">Agent triages inbound claims, drafts an assessment and routes to the right adjuster; adjuster reviews before action.</p></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <h2>NR capture — 2026 YTD (Harris monthly)</h2><div class="hint" style="margin-bottom:14px">Direct / Indirect × One-Time / Recurring · $USD · aggregated into the monthly Harris submission</div>
+      <table class="tbl"><thead><tr><th>Type</th><th>Cadence</th><th class="num">Amount (USD)</th><th>Description</th></tr></thead><tbody>
+      <tr><td><b>Direct</b></td><td>Recurring</td><td class="num">$420,000</td><td class="muted">Reduced claims-handling FTE cost across 3 pilot customers (annualised)</td></tr><tr><td><b>Direct</b></td><td>One-Time</td><td class="num">$85,000</td><td class="muted">Backlog clearance during pilot ramp</td></tr><tr><td><b>Indirect</b></td><td>Recurring</td><td class="num">$140,000</td><td class="muted">Lower re-work / leakage from faster triage</td></tr><tr><td><b>Indirect</b></td><td>One-Time</td><td class="num">$0</td><td class="muted">—</td></tr>
+      <tr style="background:var(--bg)"><td colspan="2"><b>Total captured</b></td><td class="num"><b>$645,000</b></td><td class="muted">Measured method: pilot-customer cost baseline vs post-deployment</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card">
+      <div class="cardhead"><div><h2>Governance & risk</h2><div class="hint">Informational only — registering confers no approval (§4.2)</div></div></div>
+      <table class="tbl"><tbody><tr><td style="width:230px"><b>Data sensitivity</b></td><td><span class="rag rag-red">PHI</span></td></tr><tr><td style="width:230px"><b>Regulatory relevance</b></td><td><span class="rag rag-amber">UK GDPR · HIPAA-adjacent</span></td></tr><tr><td style="width:230px"><b>Risk tier</b></td><td><span class="rag rag-red">High</span></td></tr><tr><td style="width:230px"><b>Approval status</b></td><td><span class="rag rag-amber">Conditional — BU process</span></td></tr><tr><td style="width:230px"><b>Human oversight</b></td><td><span class="rag rag-green">Human-in-the-loop (all outputs reviewed)</span></td></tr><tr><td style="width:230px"><b>Platform</b></td><td><span class="rag rag-amber">Standalone (not on Cogito)</span></td></tr></tbody></table>
+    </div>
+  </div>
+  <aside style="display:flex;flex-direction:column;gap:20px;position:sticky;top:20px">
+    <div class="card">
+      <h2>Weekly update</h2><div class="hint" style="margin-bottom:12px">Owner check-in · under a minute · overdue by 11 days</div>
+      <div class="callout" style="margin-bottom:14px">Overdue — escalates to BU Lead after two missed weeks.</div>
+      <label class="field"><span>This week's RAG</span><div style="display:flex;gap:8px"><label class="chip" style="cursor:pointer;padding:7px 14px;"><input type="radio" name="rag"  style="margin-right:6px">On Track</label><label class="chip" style="cursor:pointer;padding:7px 14px;"><input type="radio" name="rag"  style="margin-right:6px">At Risk</label><label class="chip" style="cursor:pointer;padding:7px 14px;outline:3px solid var(--teal);outline-offset:2px"><input type="radio" name="rag" checked style="margin-right:6px">Off Track</label></div></label>
+      <label class="field"><span>One-line update</span><textarea class="inp" placeholder="What changed this week?"></textarea></label>
+      <label class="field"><span>Customers in production</span><input class="inp" type="number" value="14"></label>
+      <button class="btn btn-primary" style="width:100%">Post update</button>
+    </div>
+    <div class="card">
+      <h2>Stage history</h2>
+      <div style="margin-top:12px"><div style="display:flex;gap:12px;padding-bottom:16px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:12px;height:12px;border-radius:50%;background:var(--teal)"></span><span style="flex:1;width:2px;background:var(--border)"></span></div><div style="flex:1"><div style="font-weight:600">Idea <span class="muted" style="font-weight:400;font-size:13px">12 Nov 2025</span></div></div></div><div style="display:flex;gap:12px;padding-bottom:16px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:12px;height:12px;border-radius:50%;background:var(--teal)"></span><span style="flex:1;width:2px;background:var(--border)"></span></div><div style="flex:1"><div style="font-weight:600">Evaluation <span class="muted" style="font-weight:400;font-size:13px">04 Dec 2025</span></div><div class="hint">Vendor + data-access review</div></div></div><div style="display:flex;gap:12px;padding-bottom:16px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:12px;height:12px;border-radius:50%;background:var(--teal)"></span><span style="flex:1;width:2px;background:var(--border)"></span></div><div style="flex:1"><div style="font-weight:600">Pilot <span class="muted" style="font-weight:400;font-size:13px">21 Jan 2026</span></div><div class="hint">Two claims teams, 3 customers</div></div></div><div style="display:flex;gap:12px;padding-bottom:0"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:12px;height:12px;border-radius:50%;background:var(--red)"></span></div><div style="flex:1"><div style="font-weight:600">(current) Pilot <span class="muted" style="font-weight:400;font-size:13px">—</span></div><div class="hint">RAG red — see updates</div></div></div></div>
+    </div>
+    <div class="card">
+      <h2>Recent updates</h2>
+      <div style="border-top:1px solid var(--line);padding:12px 0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="rag rag-red">Off Track</span><span class="hint">18 Jul · R. Okonjo</span></div><div style="font-size:14px;color:var(--slate)">Model accuracy dipped after policy-schema change; triage paused for 2 of 3 customers pending re-eval.</div></div><div style="border-top:1px solid var(--line);padding:12px 0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="rag rag-amber">At Risk</span><span class="hint">04 Jul · R. Okonjo</span></div><div style="font-size:14px;color:var(--slate)">Customer 3 onboarded but latency above SLA; tuning in progress.</div></div><div style="border-top:1px solid var(--line);padding:12px 0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="rag rag-amber">At Risk</span><span class="hint">27 Jun · R. Okonjo</span></div><div style="font-size:14px;color:var(--slate)">Pilot extended 4 weeks; PHI handling sign-off still outstanding.</div></div>
+    </div>
+  </aside>
+</div>
+  </main>
+</div>
+</body></html>
