@@ -8,7 +8,7 @@ operating model (surfaces of truth · five-phase lifecycle · risk-scaled review
 adapted for a FULLY LOCAL build: no Jira, no Azure, no external services required to deliver.
 -->
 
-**Version:** 1.1.2 · **Ratified:** 2026-07-20 · **Last amended:** 2026-07-21 (DR-0001, DR-0002) · **Owner:** Craig Millard (Vanguard)
+**Version:** 1.2.0 · **Ratified:** 2026-07-20 · **Last amended:** 2026-07-21 (DR-0001, DR-0002, DR-0003) · **Owner:** Craig Millard (Vanguard)
 **Story key:** `HAP` (local identifier scheme; survives unchanged if a tracker is adopted later)
 
 ## Preamble
@@ -31,6 +31,8 @@ Nothing is duplicated as a source. Each surface is authoritative for exactly one
 | **Backlog-as-files** (`docs/backlog/`) | WHAT'S NEXT & WHAT SHIPPED | One markdown file per story (`HAP-N-slug.md`) with YAML frontmatter: status, wave, epic, FR-IDs, risk class, estimates, measured worklogs, closure record (merge SHA, panel, tests). `board.md` is a generated index, never hand-authored truth |
 | **Git repository** (local) | WHAT THE CODE IS | .NET 8 API, React/TypeScript client, docker-compose, the spec bundle itself, and the append-only `ai-change-log.csv`. Every merge to `main` is a squash merge that passed its risk-class review. A remote (GitHub) may be added later; local `main` is the line of record until then |
 | **`CLAUDE.md`** (repo root) | HOW WORK HAPPENS | The binding agent contract implementing this constitution: drift sweep, phase workflow, risk triggers, time-tracking mechanics, hard don'ts. Loaded by every agent session |
+| **Wiki** (`docs/wiki/`) | HOW IT WORKS, AS BUILT | One page per subsystem, describing shipped behaviour (per DR-0003). A derived surface: it explains the system that exists; it never restates the spec (WHAT/WHY), the backlog (status), or decision records (why decided). Updated in the closure commit of any story that changes that subsystem — a stale wiki page is drift |
+| **User guide** (`docs/user-guide/` + in-app help content) | HOW USERS OPERATE IT | End-user documentation for the mandated flows (per DR-0003; spec FR-072/FR-073). In-app help content is versioned data per Art. II.4; the printable guide is updated in the closure commit of any story changing user-facing behaviour |
 
 **The join:** the story key is the foreign key of the whole operation. Branch `HAP-N-fr-x-slug`, commit `feat(HAP-N): … [FR-X]`, story file `docs/backlog/HAP-N-*.md`. The `[FR-ID]` travels beside the key in every commit so traceability to requirements survives any future re-tooling. The session-cost hook extracts `HAP-N` from the branch and tags every token spent to the story.
 
@@ -56,7 +58,7 @@ Every story runs the same loop. The sync points state what each phase writes to 
 - **Phase 1 · Setup.** Read the story file and its FR in the spec; check for prior attempts (never silently redo); create worktree + branch; classify risk from the trigger table (Article V); write the T-shirt Original Estimate into the story frontmatter. Writes: story file → `status: in-progress` + estimate (committed) · worktree → `.wallclock-HAP-N-dev` start timestamp.
 - **Phase 2 · Dev loop.** Implement with tests alongside (TDD default). Run `./scripts/verify.sh` — the gate of record. Launch the review panel sized by risk class; loop until zero blocking notes. Writes: story file → measured dev worklog entry.
 - **Phase 3 · QA loop.** Separate agent, adversarial. For any story touching assessment data or rollups: attempt to read scores outside the management chain, defeat small-group suppression, and desynchronise a rollup from its underlying records. Writes: story file → QA worklog entry + QA outcome notes.
-- **Phase 4 · Closure.** Squash-merge to `main`; in the same closure sequence commit the story file's closure record (files, tests, merge SHA, risk class, panel) with `status: done`, and the `ai-change-log.csv` row; then remove worktree and branch. Ends with the **four-box checklist**: squash merge on main · story file closed with SHA · change-log row on main · worktree gone. **Three of four is not Done.**
+- **Phase 4 · Closure.** Squash-merge to `main`; in the same closure sequence commit the story file's closure record (files, tests, merge SHA, risk class, panel) with `status: done`, the `ai-change-log.csv` row, and updates to any `docs/wiki/` and `docs/user-guide/` pages whose subject the story changed; then remove worktree and branch. Ends with the **four-box checklist**: squash merge on main · story file closed with SHA · change-log row on main · worktree gone. **Three of four is not Done.**
 
 ## Article V — Mechanical Risk Classification
 

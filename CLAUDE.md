@@ -38,6 +38,8 @@ HAP/
     ├── decisions/             ← append-only decision records + QUESTIONS.md
     ├── delivery/              ← wave plan
     ├── frameworks/            ← AI-DLC framework as data (JSON + HTML explainer pairs)
+    ├── wiki/                  ← AS-BUILT docs: one page per subsystem, updated at closure (DR-0003)
+    ├── user-guide/            ← end-user guide; in-app help content is seeded data (FR-072/073)
     └── ai-change-log.csv      ← append-only ship log
 ```
 
@@ -131,7 +133,7 @@ QA is adversarial, run as a **fresh agent** (no shared context with Dev):
 ## 10. Phase 4 — Closure (safe order, always)
 
 1. From `main`: `git merge --squash HAP-<n>-…` then commit as `feat(HAP-<n>): … [FR-x]`. Note the SHA.
-2. **Record before cleanup:** in one closure commit on `main`, write the story file's `closure:` block (sha, files, tests, risk class, panel) with `status: done`, append the `docs/ai-change-log.csv` row (story, date, sha, class, FR-IDs), and regenerate `board.md`.
+2. **Record before cleanup:** in one closure commit on `main`, write the story file's `closure:` block (sha, files, tests, risk class, panel) with `status: done`, append the `docs/ai-change-log.csv` row (story, date, sha, class, FR-IDs), update any `docs/wiki/` page whose subsystem the story changed and any `docs/user-guide/` page whose user-facing behaviour it changed (a stale page is drift), and regenerate `board.md`.
 3. Remove the worktree and delete the branch.
 4. **Four-box checklist — say it explicitly:** ☐ squash merge on main ☐ story file done with SHA ☐ change-log row on main ☐ worktree gone. **Three of four is not Done.**
 
