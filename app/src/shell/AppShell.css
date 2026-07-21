@@ -1,0 +1,115 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  color: var(--color-page-black);
+  background: var(--color-light-gray-surface);
+}
+
+/* Focus is never removed — 3px brand-teal ring, 2px offset (DESIGN.md A5). */
+:focus-visible {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-skip-link {
+  position: absolute;
+  left: var(--space-md);
+  top: -3rem;
+  z-index: 10;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-pure-white);
+  color: var(--color-brand-teal);
+  border-radius: var(--radius-input);
+  transition: top 150ms ease;
+}
+
+.app-skip-link:focus {
+  top: var(--space-sm);
+}
+
+.app-topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-lg);
+  background: var(--color-deep-navy);
+  color: var(--color-pure-white);
+}
+
+.app-brand {
+  font-family: var(--font-family-display);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+}
+
+.app-user {
+  font-size: var(--type-table-cell-size);
+}
+
+.app-user-label {
+  color: var(--color-light-teal-accent);
+}
+
+.app-body {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+.app-nav {
+  width: 240px;
+  flex: 0 0 240px;
+  padding: var(--space-md) 0;
+  background: var(--color-deep-navy);
+}
+
+.app-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.app-nav-item {
+  display: block;
+  padding: var(--space-sm) var(--space-lg);
+  color: var(--color-pure-white);
+  text-decoration: none;
+  font-size: var(--type-body-size);
+}
+
+.app-nav-item:hover {
+  background: var(--color-brand-teal);
+}
+
+.app-content {
+  flex: 1 1 auto;
+  max-width: 1440px;
+  padding: var(--space-xl);
+  background: var(--color-pure-white);
+}
+
+.app-page-title {
+  margin: 0 0 var(--space-md);
+  font-family: var(--font-family-display);
+  font-size: var(--type-page-title-size);
+  line-height: var(--type-page-title-line);
+  font-weight: var(--type-page-title-weight);
+  color: var(--color-page-black);
+}
+
+.app-page-body {
+  margin: 0;
+  color: var(--color-slate-text);
+}

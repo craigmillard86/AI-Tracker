@@ -1,0 +1,57 @@
+# Local runtime for the HIG AI Adoption Platform (constitution Art. IX.1).
+# No external services, no credentials — `docker compose up -d --build` is the
+# whole stack: api, app, postgres, mailpit. All outbound email lands in mailpit.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hap
+      POSTGRES_PASSWORD: hap
+      POSTGRES_DB: hap
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hap -d hap"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.20.0
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      ConnectionStrings__Hap: "Host=postgres;Port=5432;Database=hap;Username=hap;Password=hap"
+      ASPNETCORE_URLS: "http://+:8080"
+      Smtp__Host: "mailpit"
+      Smtp__Port: "1025"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

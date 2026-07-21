@@ -1,0 +1,4 @@
+# Normalise line endings. Shell scripts MUST stay LF or they break under bash
+# (a CR in the shebang line makes the interpreter lookup fail on Windows checkouts).
+* text=auto
+*.sh text eol=lf
