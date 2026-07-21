@@ -29,8 +29,10 @@ As an EVP, the system generates my weekly and monthly Harris submissions — cat
 - [ ] NR-line 409 guard from HAP-14 verified end-to-end: after a monthly submission persists, deleting a referenced NR line → 409.
 - [ ] Submissions are persisted immutably (no update endpoint; regeneration creates a new submission row with new as-of — test).
 - [ ] Generation completes < 30s per BU against full synth data (SC-008 timing assertion).
-- [ ] QA (adversarial, fresh agent — mandatory L3 attempts): attempt to make any submission figure disagree with underlying rows (mutate register post-generation and verify the persisted submission still reconciles to its as-of snapshot semantics; regenerate and verify new figures); attempt to smuggle an "Other" initiative into a reported count; document here.
+- [ ] QA (adversarial, fresh agent — mandatory L3 attempts): attempt to make any submission figure disagree with its records **at generation time** (generate, then immediately recompute every line independently — must match exactly); then mutate the register and verify the persisted document is **unchanged** (immutability) and a **regenerated** submission reconciles to the new state (FR-046 as amended / DR-0004 — past submissions are never retro-recomputed; mutable classification fields carry no history, while stage DOES and is read from its immutable history at generation — FR-028/064, research D5 clarification); attempt to smuggle an "Other" initiative into a reported count; document here.
 - [ ] Wiki (DR-0003, at closure): create `docs/wiki/harris-submissions.md`.
 - [ ] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** reconciliation window defined — proven at generation time; persisted submissions immutable; the old "as-of snapshot semantics" QA wording was unimplementable (mutable fields have no temporal history) and is replaced.

@@ -32,6 +32,8 @@ All Technical Context unknowns resolved. Stack, ports, and privacy architecture 
 
 **Rationale**: Persisting the generated document gives G2 a fixed artifact to reconcile line-by-line, and independent-query verification is the constitution's own definition of reconciliation (Art. VI.4). **Rejected**: regenerate-on-view only (nothing stable to witness at G2); reusing production queries in tests (circular — proves nothing).
 
+*Clarified (audit 2026-07-21):* reconciliation is asserted **at generation time** — mutable classification fields (category, AI-DLC level, customers) carry no temporal history, so a past submission is not retro-recomputable; persisted submissions are immutable, later register edits require regeneration (a new document), and G2 witnesses a freshly generated submission (spec FR-046; DR-0004). **Stage is the deliberate asymmetry** (panel A4): each line reconciles to the record state read at generation time — stage from the immutable stage history at that instant (FR-028/FR-064, incl. Retired counted at stage-when-retired), mutable classification fields at their then-current value.
+
 ## D6. PDF export (FR-049)
 
 **Decision**: Print stylesheet on the submission review screen; "Export PDF" invokes the browser print dialog. No PDF library.

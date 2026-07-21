@@ -8,7 +8,7 @@
 
 ## Summary
 
-Build the fully local Phase 1 MVP: org hierarchy from a synthetic directory, dev-provider sign-in for all seven roles, framework engine seeded from versioned data, global monthly assessment cycles with self + manager moderation, rollups behind a single L3 visibility seam (chain-of-command + role scope + N<4 suppression with complement defense), an initiative register aligned to the Harris taxonomy, and pre-filled weekly/monthly Harris submission reports that reconcile 100% to underlying records. Twenty stories in three waves; HAP-12 flags Gate G1 readiness, HAP-20 flags Gate G2 readiness.
+Build the fully local Phase 1 MVP: org hierarchy from a synthetic directory, dev-provider sign-in for all seven roles, framework engine seeded from versioned data, global monthly assessment cycles with self + manager moderation, rollups behind a single L3 visibility seam (chain-of-command + role scope + N<4 suppression with complement defense), an initiative register aligned to the Harris taxonomy, and pre-filled weekly/monthly Harris submission reports that reconcile 100% to underlying records. Twenty-one stories in three waves; HAP-12 flags Gate G1 readiness, HAP-20 flags Gate G2 readiness.
 
 ## Technical Context
 

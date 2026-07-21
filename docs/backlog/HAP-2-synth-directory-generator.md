@@ -24,9 +24,11 @@ As the platform team, we need a deterministic, seeded synthetic directory coveri
 ## Acceptance criteria
 - [ ] `./scripts/synth/generate.sh` writes `backend/src/Hap.Synth/output/directory.json` conforming to the DirectorySnapshot shape in contracts/api.md; output metadata records the seed and generator version.
 - [ ] Running the script twice produces byte-identical output (determinism test in Hap.Domain.Tests or a dedicated Hap.Synth test).
-- [ ] Population: 23 BUs across 6 groups / 3 portfolios; 300–800 people per BU; total ≥10,000 people (asserted by test).
-- [ ] Engineered edge cases exist and are asserted by name in tests: (a) ≥1 team with exactly 3 members; (b) ≥1 BU with <4 people total; (c) ≥1 BU containing a single team; (d) ≥1 BU where one sub-team of 4 sits inside an org of 7 (complement case); (e) ≥1 person with a null manager (manager gap); (f) ≥5% contractors spread across BUs; (g) ≥1 inactive person (leaver); (h) ≥1 person flagged on_leave.
+- [ ] Population: 23 BUs across 6 groups / 3 portfolios; 300–800 people per BU; total ≥10,000 people; ≥2,000 distinct managers with ≥1 active report (derived teams — SC-008). All asserted by test.
+- [ ] Engineered edge cases exist and are asserted by name in tests: (a) ≥1 team with exactly 3 members; (b) ≥1 BU with <4 people total; (c) ≥1 BU containing a single team; (d) ≥1 BU where one sub-team of 4 sits inside an org of 7 (complement case); (e) ≥1 person with a null manager (manager gap); (f) ≥5% contractors spread across BUs; (g) ≥1 inactive person (leaver); (h) ≥1 person flagged on_leave; (i) ≥1 manager whose direct reports include a person in a different BU (cross-BU chain); (j) ≥1 contractor who is a manager of employees (Q-006 case).
 - [ ] One seeded user per role exists for the dev sign-in: Individual, Manager, BU Lead, Group Leader, Portfolio Leader, HIG Executive, Platform Admin — exported in a `seed-users.json` alongside the snapshot with stable external_refs.
 - [ ] No dependency on Bogus/faker or any randomness source other than the seeded PRNG (research D8); `./scripts/verify.sh` green.
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** added team-count assertion (SC-008 coverage gap) and two edge cases — cross-BU manager, contractor manager (Q-006).

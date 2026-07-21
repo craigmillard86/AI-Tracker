@@ -25,9 +25,11 @@ As the platform owner, I have a scripted, repeatable walkthrough proving a full 
 
 ## Acceptance criteria
 - [ ] One end-to-end evidence test (`Category=PrivacyReporting`) runs the full journey on synth data and asserts every weekly + monthly submission line reconciles exactly to independent recomputation — green under `./scripts/verify.sh`.
-- [ ] `docs/delivery/g2-walkthrough.md` gives the owner a step-by-step witnessed-run script mirroring quickstart V5, incl. the YTD boundary check and one hand-verified category count.
+- [ ] `docs/delivery/g2-walkthrough.md` gives the owner a step-by-step witnessed-run script mirroring quickstart V5, incl. the YTD boundary check and one hand-verified category count. The walkthrough generates the weekly + monthly submissions **fresh at the witnessed run** — never reconciling a stale persisted document (FR-046 as amended; DR-0004; panel A2).
 - [ ] PrivacyReporting coverage report produced: every [S]/[A] endpoint and every submission line type maps to at least one named tagged test; gaps = failures of this story.
 - [ ] Closure notes flag G2 readiness prominently.
 - [ ] `./scripts/verify.sh` green.
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 / L2 PANEL A2:** fresh-generation requirement made explicit for the G2 witnessed run (DR-0004).

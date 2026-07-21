@@ -26,10 +26,13 @@ As the platform, closing a cycle auto-adopts unmoderated self-scores (flagged), 
 - [ ] Calibration delta computation excludes AutoAdopted rows (FR-068 test: delta identical with/without an auto-adopted member).
 - [ ] Manager departed before close (is_active=false with pending reviews): pending reviews escalate to the manager's manager, who can moderate until close; at close, still-unmoderated → auto-adopt (FR-070 test using the synth leaver).
 - [ ] Scoring maths (Hap.Domain.Tests, pure, `Category=PrivacyReporting`): mean = arithmetic mean of 7 dimension scores to 2dp; floor level = min dimension score; distribution counts by floor level — property test over random score sets: floor ≤ every dimension score and floor ≤ mean.
-- [ ] Snapshots written for every Team/BU/Group/Portfolio/AllHig node: n, per-dimension means, floor distribution, completion %, unmoderated %, calibration delta, suppression verdict per research D2 — spot-assertions against hand-computed values for 3 synth nodes.
+- [ ] Snapshots written for every Team/BU/Group/Portfolio/AllHig node: n, per-dimension means, floor distribution, completion %, unmoderated %, calibration delta, suppression verdict per research D2 — spot-assertions against hand-computed values for 3 synth nodes. Completion denominators exclude persons deactivated before close, **but the scored population is unchanged**: a submitted/moderated mid-cycle leaver still contributes to per-dimension means and the floor distribution (FR-024 / root spec §3.5) — locked by a test using the synth leaver where scored-population n ≠ completion-denominator n and both reconcile independently (spec edge case + panel B1, audit 2026-07-21).
 - [ ] Suppression verdicts frozen: shrinking a team below 4 AFTER close does not change the stored verdict (FR-071 historical rule test); snapshots have no update path (append-only assertion).
-- [ ] Snapshot totals reconcile: sum of team n's = BU n (per BU); recompute-from-raw equals snapshot values (desync guard, `Category=PrivacyReporting`).
+- [ ] Snapshot totals reconcile: sum of team n's = BU n (per BU), where **n = scored population** (completion denominators are tracked as a separate field and reconcile separately); recompute-from-raw equals snapshot values for both populations (desync guard, `Category=PrivacyReporting`).
 - [ ] QA (adversarial, fresh agent — mandatory L3 attempts): attempt to make a snapshot disagree with underlying rows (recompute independently); attempt to read an aggregate covering <4 via any close output; document here.
 - [ ] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** completion denominator rule for mid-cycle leavers added to the snapshot criterion.
+**L2 PANEL B1 (same day):** domain specialist required the §3.5 retention guard — submitted leavers stay in scored aggregates; scored-n vs completion-n disambiguated and both locked by tests.

@@ -23,7 +23,7 @@ As an EVP (or delegate), I declare my BU's weekly AI-DLC level beside the measur
 - Parallelisable: no (migration chain)
 
 ## Acceptance criteria
-- [ ] `POST /api/bus/{buId}/declarations`: declared level 0–3, next-level date, RAG, optional note; one per BU per week (second post same week → 409 or upsert per contract — pick upsert, test it); BU Lead/delegate of that BU only (role test).
+- [ ] `POST /api/bus/{buId}/declarations`: declared level 0–3, next-level date, RAG, optional note; one per BU per week — same-week resubmission **upserts** (FR-047 as amended 2026-07-21, test it); caller must be the BU Lead of that BU or hold an audited `BuDelegate` grant for that BU (data-model RoleGrant as amended; role test includes a denied non-delegate).
 - [ ] `GET /api/bus/{buId}/declarations` returns declaration history + the measured evidence panel (floor distribution + mean trend from rollups), and the declared-vs-measured divergence value that HAP-16 will report (FR-047).
 - [ ] `POST /api/bus/{buId}/metrics` month N: YTD fields pre-populated from month N-1 for editing; SOR field starts empty/current-month-only (FR-048 tests for both behaviours).
 - [ ] UI implements the mockup: two forms side-by-side/stacked per layout, EvidencePanel beside the declaration (level distribution + trend, divergence sentence), YTD carry-forward visible as pre-filled values.
@@ -32,3 +32,5 @@ As an EVP (or delegate), I declare my BU's weekly AI-DLC level beside the measur
 - [ ] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** upsert semantics fixed in spec (was a dev-time "pick one"); "delegate" now a concrete audited `BuDelegate` RoleGrant, not an undefined notion.

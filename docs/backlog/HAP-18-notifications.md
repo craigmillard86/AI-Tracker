@@ -24,7 +24,7 @@ As a non-responder, an overdue initiative owner, or an escalation recipient, I r
 ## Acceptance criteria
 - [ ] `POST /api/admin/notifications/run` executes all jobs once, synchronously, and reports counts per notification type (the deterministic test/demo path — research D7).
 - [ ] Cycle reminders: non-responders in an open cycle receive a reminder with a deep link; submitted individuals receive nothing (FR-061 test asserting exact recipient set against mailpit API).
-- [ ] Escalation summaries near close (within the configured window): each manager receives their team's incomplete list; BU Lead receives per-team summary (FR-061; recipient + content assertions via mailpit API).
+- [ ] Reminders and escalations fire at the configured thresholds (FR-061 as amended 2026-07-21 — defaults: non-responder reminders at 7, 3, and 1 days before close; escalation summaries from 3 days before close): each manager receives their team's incomplete list; BU Lead receives per-team summary (recipient + content assertions via mailpit API at each threshold).
 - [ ] Weekly-update nags: initiative in Evaluation→Scaled with no update >7d → owner nag; >14d → BU Lead escalation listing all overdue initiatives; Idea/Retired initiatives trigger nothing (FR-037 tests per threshold using back-dated synth updates).
 - [ ] Running the jobs twice in one day sends no duplicate emails (idempotence test via mailpit message count).
 - [ ] All mail goes to the compose-network mailpit only; no external SMTP config exists (config assertion).
@@ -33,3 +33,5 @@ As a non-responder, an overdue initiative owner, or an escalation recipient, I r
 - [ ] `./scripts/verify.sh` green.
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** reminder/escalation cadence made deterministic (configurable, defaults T-7/T-3/T-1 + escalations from T-3) — was "near close (within the configured window)" with no configured value anywhere.

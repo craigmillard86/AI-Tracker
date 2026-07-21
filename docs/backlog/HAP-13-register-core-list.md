@@ -24,7 +24,7 @@ As a Manager or BU Lead, I can register AI initiatives classified against the Ha
 
 ## Acceptance criteria
 - [ ] HarrisCategory seeded from data (5 categories; "Other" has `group_reported=false`, customer-deployed flags correct); a grep-guard test asserts no category name string in C#/TS source (Art. II.4).
-- [ ] `POST /api/initiatives`: Manager+ only; requires name, BU, category, AI-DLC level (1–3 validated), owner; creator's BU enforced for Managers; BU Lead can create/edit any entry in own BU, not other BUs (role-matrix test).
+- [ ] `POST /api/initiatives`: Managers and BU Leads only, **within their own BU** (roles above BU level are read-only — FR-034 as amended 2026-07-21); requires name, BU, category, AI-DLC level (1–3 validated), owner; BU Lead can create/edit any entry in own BU, not other BUs; role-matrix test includes denied create attempts by Group Leader, Portfolio Leader, and HIG Executive.
 - [ ] `GET /api/initiatives` supports full-text search on name/description and facets BU, category, stage, risk tier, AI-DLC level (FR-035; each facet has a test); dimension facet joins dimensions-advanced tags.
 - [ ] `PUT /api/initiatives/{id}` permission: owner, creator, or BU Lead of that BU (test each + a denied case).
 - [ ] UI implements the mockup: DataTable with columns BU, category, stage (+ Harris-mapped label), AI-DLC level badge, RAG chip, customers, last update; StaleRowFlag on rows >7d (amber) / >14d (red) with day count in text; filters panel; sticky header; pagination at >25 rows.
@@ -34,3 +34,5 @@ As a Manager or BU Lead, I can register AI initiatives classified against the Ha
 - [ ] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** creation authority bounded per FR-034 as amended — "Manager+" ambiguity removed; above-BU roles are read-only.

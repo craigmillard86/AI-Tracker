@@ -35,3 +35,35 @@ Does the Harris dashboard team plan an ingestion API? If yes, direct submission 
 **Blocks:** nothing in Phase 1; informs Phase 3 scope only.
 **Owner action:** ask when convenient; low urgency.
 **Status:** OPEN
+
+## 2026-07-21 · spec 001 / retroactive audit · Q-005 — Data-quality score weighting
+
+FR-038's BU data-quality score combines update timeliness and field completeness, but the spec never fixed the weights. **Provisional answer in effect:** 50% timeliness / 50% completeness, annotated in FR-038 and HAP-19. The score rolls up to group leadership, so the final formula is an owner decision → becomes a DR when answered.
+
+**Blocks:** nothing — HAP-19 builds against the provisional weighting; changing weights later is a config/data change.
+**Status:** OPEN (provisional answer in effect)
+
+## 2026-07-21 · spec 001 / retroactive audit · Q-006 — May contractor managers moderate (and view) employee scores?
+
+Contractors are excluded from assessment *participation* (FR-005/006), but a contractor can be a line manager. The chain rule (§2) is structural, which would let a contractor manager moderate and therefore view direct reports' individual scores — UK-GDPR-relevant access by a non-employee. **Provisional answer in effect:** yes, the chain is structural; moderation duty follows line management regardless of employee type. Flagged for privacy review (relevant to G1 and the DPIA).
+
+**Blocks:** nothing locally (synthetic data), but the provisional answer shapes HAP-5/HAP-9 chain logic.
+**Status:** OPEN — the provisional above was **REVERSED to restrictive** by the L2 panel; see the dated Q-006 update below (do not read this block's "yes" as current).
+
+## 2026-07-21 · governance · Q-007 — FR citation rule vs governance stories (HAP-22 precedent)
+
+Constitution Art. II says "code that cannot cite an FR-ID does not merge." HAP-22 (agent roster — docs/config only) merged with `fr: []` / change-log `none`. **Provisional answer in effect:** the rule binds *product code*; docs/process/governance stories may cite none, recording `none` in the change-log. Confirming this (or requiring a synthetic GOV-FR scheme) is an owner decision → constitution clarification (PATCH) when answered.
+
+**Blocks:** nothing.
+**Status:** OPEN (provisional answer in effect)
+
+### Q-006 update — 2026-07-21, L2 panel review (B2)
+
+Provisional answer REVERSED to **restrictive**: contractor managers get no individual-score access; their pending reviews escalate to the manager's manager; implemented behind a config flag defaulting restrictive, pending owner/DPIA ratification. Rationale: constitution Art. V "uncertainty rounds up" applied to the safeguarding seam — G1 must not certify an unratified access path (M1 = zero leaks). A "yes" answer later is a config flip + seam test update (L3).
+
+## 2026-07-21 · spec 001 / L2 panel review · Q-008 — Leaver completion-denominator rule
+
+Excluding mid-cycle leavers from the completion denominator (while their submitted/moderated scores remain in aggregates per §3.5/FR-024) changes a reported metric that rolls up the hierarchy. The rule mirrors the contractor precedent (FR-005) and is encoded in HAP-10/HAP-19 with the retention guard (panel B1), but the denominator choice itself deserves owner confirmation. **Provisional answer in effect:** leavers exit the denominator at close; alternative (count them as non-responders) rejected as penalising teams for attrition.
+
+**Blocks:** nothing — a reversal is a query change + test update.
+**Status:** OPEN (provisional answer in effect)

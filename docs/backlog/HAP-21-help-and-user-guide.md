@@ -24,9 +24,11 @@ As any user of a mandated flow, I can open contextual help that explains what I'
 
 ## Acceptance criteria
 - [ ] Each mandated flow (assessment-self, assessment-moderation, register list/detail, bu-forms, harris-submission) has a help trigger opening that flow's contextual content; content rendered from `app/src/content/help/` files — a grep-guard test asserts no help copy string lives in component source (FR-072).
-- [ ] Help content for each flow covers: what the user must do, the key rule of that flow (e.g. Δ≥2 comment, forward-only stages, purpose limitation), and where the data goes — reviewed against the matching user-guide page for consistency (checklist in PR notes, page-by-page).
+- [ ] Help content for each flow covers: what the user must do, the key rule of that flow (e.g. Δ≥2 comment, forward-only stages, purpose limitation), and where the data goes. Each help content file names its matching user-guide page in frontmatter, and a test asserts every mapped pair exists and every guide page is mapped (deterministic pairing — audit 2026-07-21; prose consistency remains reviewer judgment at L1 review).
 - [ ] `docs/user-guide/` contains completed pages per its README mapping (all six), each consistent with the in-app content (FR-073); README index links resolve.
 - [ ] Help surface uses existing components/tokens only (see Component constraint); vitest-axe passes on the help view; strings externalised.
 - [ ] `./scripts/verify.sh` green.
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** help↔guide consistency criterion made deterministic via a frontmatter pairing test — the "checklist in PR notes" wording was command-unverifiable.

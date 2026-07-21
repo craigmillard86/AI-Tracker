@@ -20,6 +20,16 @@
 - Q: Is an assessment cycle global per framework or per-BU? → A: One global monthly cycle per framework; a BU is in scope only once onboarded, and a BU onboarding mid-cycle joins at the next cycle open (FR-002).
 - Q: Adopt the four recommended edge-case behaviours (leave status, manager departure, stage immutability, sub-4 BU display) as binding? → A: Yes, all four — converted to FR-069, FR-070, FR-028 (amended), FR-071.
 
+### Retroactive checklist audit 2026-07-21 (post-/tasks; owner-directed)
+
+- Reconciliation window defined: proven at generation time; persisted submissions immutable (FR-046).
+- US5 scenario 1 rebound from the Phase-2 heatmap to Phase-1 tabular rollups.
+- Register creation authority bounded (FR-034); delegate = explicit audited role grant (FR-047); read-API scope bound to caller's register scope (FR-040).
+- Reminder cadence defaults set (FR-061); weekly declaration upsert semantics (FR-047); manager late-override bounded to own team (FR-002).
+- Data-quality weights provisional 50/50 pending DR (FR-038 → QUESTIONS.md Q-005); contractor-manager moderation → Q-006; governance-story FR convention → Q-007.
+- New edge cases: leaver completion denominator; cross-BU management chain.
+- L2 panel review (same day): B1 — §3.5 retention guard added to HAP-10/HAP-19 (submitted leavers stay in scored aggregates; scored-n vs completion-n disambiguated); B2 — contractor-manager default reversed to restrictive pending Q-006; US5 scenario 3 rebound from the Phase-2 heatmap; DR-0004 records generation-time reconciliation; Q-008 raised (leaver denominator rule).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — Individual Self-Assessment (Priority: P1)
@@ -100,9 +110,9 @@ A Group Leader views all BUs in their group (or Portfolio Leader views all group
 
 **Acceptance Scenarios**:
 
-1. **Given** a Group Leader at a dashboard, **When** they open the Heatmap view, **Then** they see all BUs in their group (rows) × dimensions (columns), colored by mean maturity score, with initiative counts overlaid.
+1. **Given** a Group Leader at a dashboard, **When** they open their group rollup, **Then** they see every BU in their group with per-dimension mean scores, floor-level distribution, and completion %, with drill-down to BU level. (The heatmap presentation of this same data is Phase 2 — FR-042.)
 2. **Given** a Group Leader with a portfolio of 3 groups (69 BUs), **When** a Portfolio Leader opens their consolidated view, **Then** they see rollups per group, with drill-down to BU level.
-3. **Given** the HIG Executive, **When** they open the application, **Then** they see an all-HIG heatmap, all portfolios, and the full initiative register across all BUs.
+3. **Given** the HIG Executive, **When** they open the application, **Then** they see the consolidated all-HIG rollup — every portfolio, group, and BU aggregate — and the full initiative register across all BUs. (The all-HIG heatmap presentation is Phase 2 — FR-042.)
 
 ---
 
@@ -165,6 +175,8 @@ Platform Admin configures a nightly sync from Entra ID/Graph (or HRIS export), p
 - Manager leaves HIG mid-cycle → resolved (FR-070): already-moderated scores stand; pending reviews escalate to the departing manager's manager.
 - Retroactive initiative stage change (e.g., "Production" → "Evaluation") → resolved (FR-028): stage history is immutable and forward-only; Harris submissions read the stage held at submission time.
 - BU or team smaller than 4 people → resolved (FR-071): individual-level views unaffected; aggregates display as "Suppressed"; historical aggregates that met N≥4 at the time remain visible.
+- Person deactivated (leaver) mid-cycle → resolved (audit 2026-07-21, assumption; owner confirmation Q-008): submitted/moderated work is retained and **still counts in scored aggregates** (FR-024 / §3.5); the person leaves only the completion denominator at cycle close; no further invitations or reminders.
+- Management chain crossing BU boundaries → resolved (audit 2026-07-21): the chain rule governs individual-score access regardless of BU membership (§ Users and roles); the synthetic directory includes a cross-BU manager case and the seam tests it. Whether a **contractor** manager may moderate (and thus view) employee scores is an owner decision — QUESTIONS.md Q-006 (provisional per L2 panel review, restrictive: contractor managers get no individual-score access and their pending reviews escalate to the manager's manager, behind a config flag defaulting restrictive, pending owner/DPIA ratification — uncertainty rounds up in the safeguarding seam).
 - What if the Harris form structure changes during a cycle? (Recommend: submission reports are tied to a framework version; new form structure becomes available in the next cycle's submission generation.)
 
 ### Out of Scope — Deferred to Phase 2/3 Feature Specs
@@ -183,13 +195,13 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 **Module 1: Assessment Framework & Cycles**
 
 - **FR-001**: System MUST support multiple frameworks, each with versions (immutable once a cycle uses them), dimensions (7 per v1 SDLC framework), and level descriptors (0–3 per dimension). Framework content is data, never code: the v1 framework ("AI Maturity in the SDLC") is seeded from `docs/frameworks/ai-maturity-sdlc.v1.json` (authoritative content: root spec Appendix A).
-- **FR-002**: System MUST manage assessment cycles with open/close dates, tied to a framework version. A cycle is **global per framework**: one cycle open at a time per framework, spanning all onboarded BUs mapped to it; a BU onboarding mid-cycle joins at the next cycle open. Cycles MUST lock at close; late submissions require manager or admin override.
+- **FR-002**: System MUST manage assessment cycles with open/close dates, tied to a framework version. A cycle is **global per framework**: one cycle open at a time per framework, spanning all onboarded BUs mapped to it; a BU onboarding mid-cycle joins at the next cycle open. Cycles MUST lock at close; late submissions require a manager override (own team only) or admin override.
 - **FR-003**: System MUST auto-generate invitations for all in-scope individuals (from org sync + BU/framework mapping) when a cycle opens.
 - **FR-004**: System MUST enforce mandatory participation: individuals in registered BUs cannot opt out of an open cycle.
 - **FR-005**: System MUST support contractor exclusion (configurable per cycle): contractors receive no invitations and do not count toward headcount/completion %.
 - **FR-006**: System MUST persist contractor status per individual from directory sync (employee type attribute); manual override layer available for corrections with audit trail.
 - **FR-060**: Assessment cycles MUST run on a monthly cadence, each running the full self + manager review flow. (Cadence keeps trend data fresh; the pre-population and carry-forward defaults in FR-062/FR-063 keep the burden proportionate.)
-- **FR-061**: System MUST send automated reminders to non-responders and escalation summaries to managers and the BU Lead as the cycle close date approaches, and MUST provide live completion dashboards per team/BU/group throughout the open cycle.
+- **FR-061**: System MUST send automated reminders to non-responders and escalation summaries to managers and the BU Lead as the cycle close date approaches, and MUST provide live completion dashboards per team/BU/group throughout the open cycle. Cadence is configurable per cycle; defaults: non-responder reminders at 7, 3, and 1 days before close; escalation summaries from 3 days before close.
 - **FR-069**: A person on leave or temporarily detached from a manager during a cycle MUST still be invited (if in a registered BU), MUST appear in the manager's review list with a "leave" status, and MUST have manager linkage restored automatically by subsequent directory syncs.
 
 **Module 1: Assessment Scoring Workflow**
@@ -238,13 +250,13 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 
 **Module 2: Register Behaviors & Reporting**
 
-- **FR-034**: System MUST allow Manager+ to create initiatives; BU Lead can edit/curate all entries in their BU. No approval workflow in v1.
+- **FR-034**: System MUST allow Managers and BU Leads to create initiatives **within their own BU**; the BU Lead can edit/curate all entries in their BU. Roles above BU level (Group Leader, Portfolio Leader, HIG Executive) have read-only register access per the role table. No approval workflow in v1.
 - **FR-035**: System MUST support full-text search and faceted filtering (BU, stage, category, risk tier, model/vendor, dimension) on the initiative register.
 - **FR-036** *(Phase 2 — deferred)*: System MUST provide a duplication/consolidation view: initiatives grouped by category/technology across BUs to identify independent builds of the same capability. (Data model support — category/technology tagging — ships in Phase 1 via FR-027/FR-032; the view is Phase 2.)
 - **FR-037**: System MUST enforce weekly update discipline for active initiatives (Evaluation → Scaled): nag owners at 7 days; escalate to BU Lead at 14 days overdue.
-- **FR-038**: System MUST provide data-quality scoring per BU: update timeliness (% current) + completeness of value/governance fields.
+- **FR-038**: System MUST provide data-quality scoring per BU: update timeliness (% current) + completeness of value/governance fields, combined 50% / 50% *(provisional weighting — pending DR; QUESTIONS.md Q-005)*.
 - **FR-039**: System MUST support CSV/Excel export of initiative register.
-- **FR-040**: System MUST provide a read API for downstream reporting and integration.
+- **FR-040**: System MUST provide a read API for downstream reporting and integration. Scope: register data only, filtered to the caller's register read scope per the role table; no assessment-derived field is reachable through it.
 
 **Module 2: Cross-Module Integration**
 
@@ -258,8 +270,8 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 - **FR-064**: Harris submission generation MUST apply the Harris stage mapping: Idea + Evaluation → *Ideation*; Pilot → *Development*; Production + Scaled → *Production*; Retired → *Ideas Tried but Stopped*, counted at the stage held when retired (taken from the immutable stage history). The mapping is configuration data, never hard-coded logic.
 - **FR-065**: System MUST compute divergence between the declared BU AI-DLC level (weekly declaration) and the measured maturity distribution, and MUST make that divergence reportable to group leadership.
 - **FR-045**: Monthly submission MUST include: per-category NR (Direct/Indirect, One-Time/Recurring, $USD, YTD), Support metrics (internal/customer), API/SOR usage.
-- **FR-046**: System MUST pre-fill Harris submission fields from: initiative register + weekly declaration (weekly report); register financials + monthly BU metrics (monthly report). Submission counts MUST reconcile 100% to underlying records.
-- **FR-047**: System MUST support EVP declaration of weekly BU AI-DLC level (0–3) with evidence panel showing measured maturity distribution and trend.
+- **FR-046**: System MUST pre-fill Harris submission fields from: initiative register + weekly declaration (weekly report); register financials + monthly BU metrics (monthly report). Submission counts MUST reconcile 100% to underlying records, **proven at generation time**: submissions persist as generated and are immutable; later register edits never retroactively alter a persisted submission — regeneration produces a new reconciled document. Gate G2 witnesses a freshly generated submission.
+- **FR-047**: System MUST support EVP declaration of weekly BU AI-DLC level (0–3) with evidence panel showing measured maturity distribution and trend. One declaration per BU per week — resubmission within the same week updates it (upsert). Submission of declarations or monthly metrics by a **delegate** requires an explicit, audited delegate role grant (audited per FR-050).
 - **FR-048**: System MUST support monthly BU metrics form: Support metrics, SOR usage, with prior-month YTD auto-carry for editing.
 - **FR-049**: System MUST generate PDF exports of Harris submission reports, mirroring the form layout.
 

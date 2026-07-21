@@ -3,7 +3,7 @@ id: HAP-9
 title: Manager moderation — review queue, divergence rules, transparency (assessment-moderation.html)
 epic: E2-assessment
 wave: 1
-fr: [FR-008, FR-009, FR-010, FR-011, FR-012, FR-063]
+fr: [FR-008, FR-009, FR-010, FR-011, FR-012, FR-063, FR-069]
 risk: L3                # trigger: read path over Assessments/AssessmentScores + individual-view audit writes
 status: todo
 estimate: {dev: L, qa: M}
@@ -34,3 +34,5 @@ As a Manager, I review each direct report's self-scores and evidence side by sid
 - [ ] `./scripts/verify.sh` green.
 
 ## Attempts / notes
+
+**SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** FR-069 added to frontmatter — this story ships the leave-status *display* (FR-069); HAP-10 also cites FR-069 for leave handling at close, while departure *escalation* is FR-070 (intentional dual citation for change-log traceability; panel nit A5).

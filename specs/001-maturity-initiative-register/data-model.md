@@ -25,7 +25,8 @@ Entities mapped from spec Key Entities + FRs. PostgreSQL via EF Core, forward-on
 - **Every write also writes an AuditLog row**; overrides survive re-sync (applied after import)
 
 ### RoleGrant (FR-056)
-- id, person_id, role (`PlatformAdmin` | `HigExecutive` | explicit viewer grants), granted_by, created_at
+- id, person_id, role (`PlatformAdmin` | `HigExecutive` | `BuDelegate(bu_id)` | explicit viewer grants), granted_by, created_at
+- `BuDelegate` authorises declaration/monthly-metrics submission for one BU (FR-047, audit 2026-07-21); every grant writes a `RoleGrant` audit row (FR-050)
 - Hierarchy-derived roles (Manager, BU Lead, Group Leader, Portfolio Leader) are **computed from org structure, never stored**
 
 ## Framework (data, not code — FR-001)
