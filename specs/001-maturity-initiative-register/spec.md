@@ -274,7 +274,7 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 
 **Infrastructure & Notifications**
 
-- **FR-055**: System MUST authenticate via Entra ID SSO (OIDC); no local accounts.
+- **FR-055**: System MUST authenticate via the identity provider port (`IIdentityProvider`). The local build ships the dev provider (seeded synthetic users covering all seven roles, selectable at sign-in); the production adapter is Entra ID SSO (OIDC), a deferred decision-recorded story. No local password accounts exist in production.
 - **FR-056**: System MUST derive role assignment from directory groups plus in-app grants for Group Viewer/Admin.
 - **FR-057**: System MUST send email notifications (no Teams) for: cycle open, reminders, assessment completion, moderation completion, overdue initiatives, escalations, monthly digest.
 - **FR-058**: System MUST support daily backup with tested restore.
@@ -315,7 +315,7 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 - **SC-005**: All individual-level assessment data access is logged; zero reads occur outside the management chain (verified via access-control audit for all 7 seeded roles: Individual, Manager, BU Lead, Group Leader, Portfolio Leader, HIG Executive, Platform Admin).
 - **SC-006**: Small-group suppression (N<4) is enforced: no aggregate or trend view reveals individual-level scores when N<4, **including by differencing** published aggregates against their parent/sibling aggregates. Spot-checks: (a) attempt to infer an individual's score from aggregates covering N=3 people; (b) attempt to derive a <4 complement by subtracting a team aggregate from its BU aggregate → both must be impossible.
 - **SC-007**: Assessment flow is WCAG 2.2 AA compliant: every Individual and Manager user can complete their workflow using keyboard navigation, screen readers, and high-contrast modes without loss of functionality.
-- **SC-008**: System supports ≥23 BUs, ≥500 teams (estimated 3–20 per BU), ≥10,000 people (estimated 300–800 per BU), and can compute all rollups and generate Harris submissions in <30 seconds per BU.
+- **SC-008**: System supports ≥23 BUs, ≥2,000 teams (a team = a manager's direct reports, typically 5–10 people), ≥10,000 people (estimated 300–800 per BU), and can compute all rollups and generate Harris submissions in <30 seconds per BU.
 - **SC-009**: Org sync (Entra ID / HRIS) completes nightly in <30 minutes; no sync failures cause data loss or orphaned records.
 - **SC-010**: Email notifications (cycle open, reminders, completion, escalations) are delivered within 1 hour of the event; no >24 hour delays observed over a full cycle.
 - **SC-011**: BU data-quality score (update timeliness + completeness) is visible to Group Leadership; Cycle 1 end: average BU completeness ≥80% (value + governance fields populated).
@@ -340,6 +340,8 @@ This spec covers **Phase 1 MVP only** (root spec §7). Explicitly out of scope h
 ---
 
 ## Open Questions
+
+Tracked in `docs/decisions/QUESTIONS.md` (Q-001..Q-003) per CLAUDE.md §6.3; summarised here. None block local build work.
 
 [QA-001] **Directory Attributes**: Which AD/Entra attributes reliably carry the group/portfolio mapping and employee type across all 23 BUs? Directory hygiene audit needed before rollout; expect inconsistency between BU tenants/domains.
 
