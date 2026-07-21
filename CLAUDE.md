@@ -80,7 +80,7 @@ As a manager I can review each report's self-scores…
 
 Never work on `main`. Never reuse a branch across stories.
 
-## 5. Phase 0 — Drift sweep (every session, before anything)
+## 5. Phase 0 — Drift sweep (every session, before anything) — run by `hap-drift-auditor`
 
 1. `git log --oneline --merges -20 main` (squash merges appear as the `feat(HAP-N)` commits on main — list last 20 story commits: `git log --oneline -20 main -- . ':!docs/backlog' ':!docs/ai-change-log.csv'` and cross-check):
    - each shipped `HAP-<n>` has a row in `docs/ai-change-log.csv` on `main`;
@@ -103,10 +103,12 @@ First match wins. Unsure? Take the higher row. Class is decided by **what the di
 
 | Class | Any change touching… | Panel | Merge requires |
 |---|---|---|---|
-| **L3** | `backend/src/Hap.Api/Authorization/**` · the management-chain resolver · role-scope or visibility predicates · N<4 suppression logic · any read path over `Assessments`/`AssessmentScores` tables · audit-log write/read paths (`Hap.Infrastructure/Audit/**`) · GDPR retention/erasure/export · Harris submission generation + its aggregation queries (`Hap.Domain/Submissions/**`) · directory-import writes to people/hierarchy | 3 agents: code-reviewer + domain specialist + **red-team** (§9) | verify green incl. `Category=PrivacyReporting` suite + all 3 sign-offs + flag for G1/G2 if applicable |
-| **L2** | EF migrations / schema · directory-import read logic · `IIdentityProvider` implementations & session handling · scoring & rollup maths (`Hap.Domain/Scoring/**`) · NR aggregation · cycle state machine · notification scheduling · `scripts/verify.sh` itself · **any new dependency** (NuGet or npm) | 2 agents: code-reviewer + domain specialist | verify green + both sign-offs |
-| **L1** | React components/screens, copy, playbook/nudge content, email templates | 1 agent | verify green + sign-off |
-| **L0** | docs, comments, test-only additions | 1 agent | verify green + sign-off |
+| **L3** | `backend/src/Hap.Api/Authorization/**` · the management-chain resolver · role-scope or visibility predicates · N<4 suppression logic · any read path over `Assessments`/`AssessmentScores` tables · audit-log write/read paths (`Hap.Infrastructure/Audit/**`) · GDPR retention/erasure/export · Harris submission generation + its aggregation queries (`Hap.Domain/Submissions/**`) · directory-import writes to people/hierarchy | 3 agents: `hap-code-reviewer` + `hap-domain-specialist` + **`hap-red-team`** (§9) | verify green incl. `Category=PrivacyReporting` suite + all 3 sign-offs + flag for G1/G2 if applicable |
+| **L2** | EF migrations / schema · directory-import read logic · `IIdentityProvider` implementations & session handling · scoring & rollup maths (`Hap.Domain/Scoring/**`) · NR aggregation · cycle state machine · notification scheduling · `scripts/verify.sh` itself · `.claude/agents/**` (agent definitions participate in merge authority) · **any new dependency** (NuGet or npm) | 2 agents: `hap-code-reviewer` + `hap-domain-specialist` | verify green + both sign-offs |
+| **L1** | React components/screens, copy, playbook/nudge content, email templates | 1 agent: `hap-code-reviewer` (+ `hap-design-reviewer` for UI stories) | verify green + sign-off |
+| **L0** | docs, comments, test-only additions | 1 agent: `hap-code-reviewer` (+ `hap-design-reviewer` if UI-facing) | verify green + sign-off |
+
+Panel roster lives in `.claude/agents/` (project-scoped, versioned). QA (§9) is run by `hap-qa` as a fresh instance; the Phase 0 drift sweep (§5) is run by `hap-drift-auditor`. Builder specialists (`dotnet-core-expert`, `react-specialist`, `typescript-pro`, `postgres-pro`, `accessibility-tester`) assist Dev; they are not review-panel members.
 
 Commonly misclassified: a "one-line" WHERE-clause change in an assessment query → **L3**. A patch-version dependency bump → **L2**. Renaming a button on the assessment form → **L1**.
 
@@ -117,12 +119,12 @@ Commonly misclassified: a "one-line" WHERE-clause change in an assessment query 
 3. Framework content, Harris form structure, taxonomies, hierarchy mappings = data, not code. Writing a dimension name in C#/TS means it belongs in docs/frameworks/ or a seeded table instead.
 4. All assessment reads go through the authorisation layer. Need a query the seam doesn't support? Extend the seam (L3) — never go around it.
 5. Run ./scripts/verify.sh — the gate of record: builds both stacks warnings-as-errors, runs all tests (backend, frontend, lint, typecheck) against a disposable dockerised Postgres, compiles migrations idempotently, and always runs the PrivacyReporting regression suite. Requires only Docker + local toolchains. Green exit or the story is not reviewable. Never edit verify.sh to make it pass (verify.sh changes are L2 in their own right).
-6. Launch the review panel sized by class (§7): spawn each reviewer as a separate agent with the diff, the story file, the FR, and — for the domain specialist — the relevant spec section. Record each sign-off in the story file notes. Loop until zero blocking notes.
+6. Launch the review panel sized by class (§7), spawning each named agent (`hap-code-reviewer`, `hap-domain-specialist`, `hap-red-team`, `hap-design-reviewer`) as a separate instance with the diff, the story file, the FR, and — for the domain specialist — the relevant spec section. Record each sign-off in the story file notes. Loop until zero blocking notes.
 7. Clock out: take the UTC close timestamp, append the worklog entry {phase: dev, start, end, mins} to the frontmatter (floor 1 minute; if >4× estimate, note it — don't shave it). Lost the timestamp? Log nothing and say so. Never log "felt like" time. Set status: qa, commit.
 
 ## 9. Phase 3 — QA loop (different agent instance)
 
-QA is adversarial, run as a **fresh agent** (no shared context with Dev):
+QA is adversarial, run by `hap-qa` as a **fresh agent** (no shared context with Dev):
 
 1. Start `.wallclock-HAP-<n>-qa`.
 2. Verify every acceptance-criterion clause literally. Add negative-path tests (QA-window tests are QA work).
