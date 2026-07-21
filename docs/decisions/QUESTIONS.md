@@ -20,6 +20,14 @@ Confirm with the Harris AI Dashboard owner: (a) the stage mapping (Idea+Evaluati
 **Owner action:** confirm with whoever owns the Harris AI Dashboard definitions.
 **Status:** OPEN
 
+## 2026-07-21 · spec 001 / tasks · Q-004 — No mockups for admin surfaces or sign-in
+
+The mockup set covers the seven user-facing screens only. No mockup exists for: the dev sign-in role picker (HAP-4), or any Platform Admin surface (cycle management, org sync, overrides, role grants, audit search, notifications trigger — HAP-3/7/12/18). Provisional answer recorded per CLAUDE.md §6.3: **admin surfaces ship API-only in v1** (exercised via quickstart/curl and integration tests) and **sign-in ships as a minimal DESIGN.md-conformant screen** (cards + buttons, no new components). Stories are written to that assumption.
+
+**Blocks:** nothing — stories proceed on the provisional answer.
+**Owner action:** confirm the provisional answer, or supply mockups (which would add L1 UI stories for the admin surfaces).
+**Status:** OPEN (provisional answer in effect)
+
 ## 2026-07-21 · spec 001 (maturity-initiative-register) · Q-003 — Harris ingestion API roadmap
 
 Does the Harris dashboard team plan an ingestion API? If yes, direct submission replaces the review-and-transcribe step (Phase 3 candidate).
