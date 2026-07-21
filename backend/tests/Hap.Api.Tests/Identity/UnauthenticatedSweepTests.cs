@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -49,23 +50,29 @@ public sealed class UnauthenticatedSweepTests
         // ASP.NET's group + empty-string-route combination keeps the separator).
         Assert.Contains(apiRoutes, r => r.Pattern == "/api/admin/frameworks/" && r.Method == "GET");
         Assert.Contains(apiRoutes, r => r.Pattern == "/api/admin/frameworks/" && r.Method == "POST");
+        // HAP-7: the first routes this sweep has ever seen with a route parameter — extended below
+        // (per this test's own "extend this test rather than skip it" instruction) rather than
+        // exempted, so a future parameterized route is swept the same way with no further changes.
+        Assert.Contains(apiRoutes, r => r.Pattern == "/api/cycles/" && r.Method == "POST"); // group + "" route, trailing slash (matches /api/admin/frameworks/ precedent above)
+        Assert.Contains(apiRoutes, r => r.Pattern == "/api/cycles/{id:guid}/open" && r.Method == "POST");
+        Assert.Contains(apiRoutes, r => r.Pattern == "/api/cycles/{id:guid}/close" && r.Method == "POST");
+        Assert.Contains(apiRoutes, r => r.Pattern == "/api/cycles/{id:guid}/late-override" && r.Method == "POST");
+        Assert.Contains(apiRoutes, r => r.Pattern == "/api/admin/business-units/{id:guid}/onboard" && r.Method == "POST");
 
         var client = _factory.CreateClient();
         foreach (var (pattern, method) in apiRoutes)
         {
-            if (pattern.Contains('{'))
-            {
-                throw new InvalidOperationException(
-                    $"route '{pattern}' has a route parameter — the sweep needs a concrete value " +
-                    "substituted before it can be requested; extend this test rather than skip it.");
-            }
+            // Route params carry no auth-relevant meaning here — the RequireAuthorization gate
+            // runs before any handler (and therefore before any 404-for-missing-resource lookup),
+            // so a syntactically valid but nonexistent value still proves 401 comes first.
+            var concretePath = Regex.Replace(pattern, @"\{[^}]+\}", _ => Guid.NewGuid().ToString());
 
-            var request = new HttpRequestMessage(new HttpMethod(method), pattern);
+            var request = new HttpRequestMessage(new HttpMethod(method), concretePath);
             var response = await client.SendAsync(request);
 
             Assert.True(
                 response.StatusCode == HttpStatusCode.Unauthorized,
-                $"{method} {pattern} should return 401 for an unauthenticated caller (got {(int)response.StatusCode}).");
+                $"{method} {concretePath} should return 401 for an unauthenticated caller (got {(int)response.StatusCode}).");
         }
     }
 }

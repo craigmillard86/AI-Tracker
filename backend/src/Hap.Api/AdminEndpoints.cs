@@ -1,5 +1,7 @@
 using Hap.Domain.Org;
+using Hap.Infrastructure;
 using Hap.Infrastructure.Directory;
+using Microsoft.EntityFrameworkCore;
 
 namespace Hap.Api;
 
@@ -85,8 +87,31 @@ public static class AdminEndpoints
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
         });
+
+        // BU onboarding (root spec "BU registration": "assign BU to group/portfolio, select
+        // applicable framework(s), and configure contractor exclusion" — line 79/158; Platform
+        // Admin capability per line 31). BusinessUnit.IsOnboarded has existed since HAP-3 but had
+        // no write path anywhere in the codebase; HAP-7 adds this minimal one because its own AC 3
+        // (mid-cycle onboarding test) requires onboarding a BU as test setup and no other story
+        // owns it (QUESTIONS.md Q-017b). Unaudited: no AuditAction case fits BU onboarding and no
+        // FR cited by any story to date calls for one.
+        admin.MapPost("/business-units/{id:guid}/onboard", async (Guid id, HapDbContext db, CancellationToken ct) =>
+        {
+            var bu = await db.BusinessUnits.SingleOrDefaultAsync(b => b.Id == id, ct);
+            if (bu is null)
+            {
+                return Results.NotFound();
+            }
+
+            bu.SetOnboarded(true);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new BusinessUnitOnboardResponse(bu.Id, bu.Code, bu.IsOnboarded));
+        });
     }
 }
+
+/// <summary>Body of POST /api/admin/business-units/{id}/onboard.</summary>
+public sealed record BusinessUnitOnboardResponse(Guid Id, string Code, bool IsOnboarded);
 
 /// <summary>Body of POST /api/admin/overrides.</summary>
 public sealed record CreateOverrideRequest(

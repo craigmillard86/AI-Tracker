@@ -61,6 +61,7 @@ var api = app.MapGroup("/api").RequireAuthorization();
 app.MapIdentityEndpoints(api);
 api.MapAdminEndpoints();
 api.MapFrameworkEndpoints();
+api.MapCycleEndpoints();
 
 app.Run();
 

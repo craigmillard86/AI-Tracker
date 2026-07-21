@@ -41,4 +41,10 @@ public sealed class BusinessUnit
         GroupId = groupId;
         DirectorySource = directorySource;
     }
+
+    /// <summary>Platform-admin onboarding decision (FR-002; root spec "BU registration": "assign BU
+    /// to group/portfolio, select applicable framework(s), and configure contractor exclusion").
+    /// Idempotent — onboarding an already-onboarded BU (or offboarding an already-offboarded one)
+    /// is a no-op, never an error.</summary>
+    public void SetOnboarded(bool onboarded) => IsOnboarded = onboarded;
 }

@@ -1,4 +1,5 @@
 using Hap.Domain.Audit;
+using Hap.Domain.Cycles;
 using Hap.Domain.Frameworks;
 using Hap.Domain.Org;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,9 @@ namespace Hap.Infrastructure;
 /// The application database context. Migration #1 (HAP-3) introduces the org model, the
 /// manual-override layer, role grants, and the append-only audit log. Migration #2 (HAP-6)
 /// chains behind it with the framework engine (Framework/FrameworkVersion/Dimension/
-/// LevelDescriptor — FR-001/FR-054). Later stories chain forward-only migrations behind this one.
+/// LevelDescriptor — FR-001/FR-054). Migration #3 (HAP-7) chains behind that with cycle
+/// management (Cycle/CycleInvitation/CycleLateOverride — FR-002/003/005). Later stories chain
+/// forward-only migrations behind this one.
 ///
 /// Note the deliberate asymmetry on <see cref="AuditLogs"/>: the entity is immutable (no
 /// setters) and no code path calls Update/Remove on this set — enforced by
@@ -35,6 +38,9 @@ public class HapDbContext : DbContext
     public DbSet<FrameworkVersion> FrameworkVersions => Set<FrameworkVersion>();
     public DbSet<Dimension> Dimensions => Set<Dimension>();
     public DbSet<LevelDescriptor> LevelDescriptors => Set<LevelDescriptor>();
+    public DbSet<Cycle> Cycles => Set<Cycle>();
+    public DbSet<CycleInvitation> CycleInvitations => Set<CycleInvitation>();
+    public DbSet<CycleLateOverride> CycleLateOverrides => Set<CycleLateOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -189,6 +195,55 @@ public class HapDbContext : DbContext
             e.Property(x => x.CreatedAt).IsRequired();
             e.HasIndex(x => new { x.DimensionId, x.Level }).IsUnique();
             e.HasOne<Dimension>().WithMany().HasForeignKey(x => x.DimensionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Cycle>(e =>
+        {
+            e.ToTable("cycles");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired();
+            e.Property(x => x.State).HasConversion<string>().IsRequired();
+            e.Property(x => x.ContractorExclusionEnabled).IsRequired();
+            e.Property(x => x.CreatedAt).IsRequired();
+            e.HasIndex(x => new { x.FrameworkVersionId, x.State });
+            e.HasOne<FrameworkVersion>().WithMany().HasForeignKey(x => x.FrameworkVersionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CycleInvitation>(e =>
+        {
+            e.ToTable("cycle_invitations");
+            e.HasKey(x => x.Id);
+            // CycleInvitation is immutable (get-only props): listed explicitly, as elsewhere.
+            e.Property(x => x.Excluded).IsRequired();
+            e.Property(x => x.ExcludedReason).HasConversion<string>();
+            e.Property(x => x.CreatedAt).IsRequired();
+            // One invitation row per person per cycle — invitation generation runs once at open
+            // (FR-003) and must never double-write for the same (cycle, person) pair.
+            e.HasIndex(x => new { x.CycleId, x.PersonId }).IsUnique();
+            e.HasOne<Cycle>().WithMany().HasForeignKey(x => x.CycleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Person>().WithMany().HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CycleLateOverride>(e =>
+        {
+            e.ToTable("cycle_late_overrides");
+            e.HasKey(x => x.Id);
+            // CycleLateOverride is immutable (get-only props): listed explicitly, as elsewhere.
+            e.Property(x => x.GrantedByRole).IsRequired();
+            e.Property(x => x.CreatedAt).IsRequired();
+            // At most one active override per (cycle, person) — CycleService.GrantLateOverrideAsync
+            // is idempotent against this exact constraint (returns the existing grant, never a
+            // duplicate row).
+            e.HasIndex(x => new { x.CycleId, x.PersonId }).IsUnique();
+            e.HasOne<Cycle>().WithMany().HasForeignKey(x => x.CycleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Person>().WithMany().HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Person>().WithMany().HasForeignKey(x => x.GrantedByPersonId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

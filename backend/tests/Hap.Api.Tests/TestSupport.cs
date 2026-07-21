@@ -101,7 +101,8 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
         await db.Database.ExecuteSqlRawAsync(
             "SET session_replication_role = 'replica'; " +
             "TRUNCATE audit_log, org_overrides, role_grants, people, business_units, groups, portfolios, " +
-            "level_descriptors, dimensions, framework_versions, frameworks RESTART IDENTITY CASCADE; " +
+            "level_descriptors, dimensions, framework_versions, frameworks, " +
+            "cycle_invitations, cycle_late_overrides, cycles RESTART IDENTITY CASCADE; " +
             "SET session_replication_role = 'origin';");
     }
 

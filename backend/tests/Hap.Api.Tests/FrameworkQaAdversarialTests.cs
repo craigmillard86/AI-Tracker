@@ -16,13 +16,21 @@ namespace Hap.Api.Tests;
 ///
 /// 1. FR-054's raw-factory gap (round-1/round-2 panel carry-forward): Dimension.Create and
 ///    LevelDescriptor.Create remain public static factories with no reference back to the owning
-///    FrameworkVersion, so nothing stops a caller from constructing content for a locked version
-///    and persisting it directly through EF, entirely bypassing FrameworkVersion.EnsureMutable().
-///    Hap.Domain.Tests.FrameworkRawFactoryLockBypassTests proves this at the entity level with no
-///    database involved; the tests here prove it end to end against a real migrated Postgres — a
-///    write actually lands under a locked version's rows — and separately confirm the one HTTP
-///    admin endpoint that writes framework content (POST /api/admin/frameworks) does NOT offer an
-///    equivalent bypass, because re-seeding an existing version is a no-op by construction.
+///    FrameworkVersion, so nothing in the DOMAIN layer stops a caller from constructing content
+///    for a locked version and persisting it directly through EF, entirely bypassing
+///    FrameworkVersion.EnsureMutable(). Hap.Domain.Tests.FrameworkRawFactoryLockBypassTests proves
+///    this gap at the entity level with no database involved. The two end-to-end tests below
+///    originally proved the SAME gap survived all the way to a real migrated Postgres — until
+///    HAP-7 (advisory A6 carry-forward: "a DB-layer guard... should land with HAP-7, when Lock()
+///    gets its first real caller") added the Postgres trigger backstop
+///    (hap_framework_version_locked_guard, migration #3). They now assert the OPPOSITE: the same
+///    raw-factory bypass attempt is rejected by the database itself. The domain-level gap these
+///    tests originally documented is unchanged (Hap.Domain.Tests still proves it) — only the
+///    end-to-end outcome flipped, because a DB-layer backstop now exists behind it, exactly the
+///    "domain guard + DB backstop" pattern audit_log already used (migration #1). Separately, the
+///    one HTTP admin endpoint that writes framework content (POST /api/admin/frameworks) is
+///    confirmed to NOT offer an equivalent bypass, because re-seeding an existing version is a
+///    no-op by construction.
 ///
 /// 2. Seeder idempotence under adversarial conditions the Dev suite's happy-path
 ///    "seed twice, second is a no-op" test did not cover: re-seeding after a manual row edit
@@ -72,31 +80,35 @@ public sealed class FrameworkLockBypassQaTests
 
     [Fact]
     [Trait("Category", "PrivacyReporting")]
-    public async Task Raw_Dimension_Create_plus_direct_DbContext_Add_persists_content_under_a_locked_version()
+    public async Task Raw_Dimension_Create_plus_direct_DbContext_Add_is_now_rejected_by_the_db_trigger_HAP7()
     {
         var lockedVersion = await SeedAndLockV1Async();
 
         using (var writeScope = _factory.NewScope())
         {
             var db = writeScope.ServiceProvider.GetRequiredService<HapDbContext>();
-            // The exact bypass: never touch FrameworkVersion.AddDimension (the guarded "sole
-            // path"), go straight to the public static factory + raw DbContext.Add/SaveChanges.
+            // The exact bypass this test originally proved succeeded: never touch
+            // FrameworkVersion.AddDimension (the domain-guarded "sole path"), go straight to the
+            // public static factory + raw DbContext.Add/SaveChanges. HAP-7's migration #3 Postgres
+            // trigger (hap_framework_version_locked_guard) now rejects this at the database layer —
+            // see this file's class doc for the full history.
             var attackerDimension = Dimension.Create(lockedVersion.Id, "attacker-dimension", "Attacker Dimension", 99);
             db.Dimensions.Add(attackerDimension);
             var ex = await Record.ExceptionAsync(() => db.SaveChangesAsync());
 
-            Assert.Null(ex); // no domain guard, no FK/DB constraint stops this either
+            Assert.NotNull(ex);
+            Assert.Contains("FR-054", ex!.ToString());
         }
 
         using var verify = _factory.NewScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<HapDbContext>();
-        Assert.Equal(8, await verifyDb.Dimensions.CountAsync(d => d.FrameworkVersionId == lockedVersion.Id)); // 7 seeded + 1 injected
-        Assert.True(await verifyDb.Dimensions.AnyAsync(d => d.Key == "attacker-dimension"));
+        Assert.Equal(7, await verifyDb.Dimensions.CountAsync(d => d.FrameworkVersionId == lockedVersion.Id)); // still just the 7 seeded
+        Assert.False(await verifyDb.Dimensions.AnyAsync(d => d.Key == "attacker-dimension"));
     }
 
     [Fact]
     [Trait("Category", "PrivacyReporting")]
-    public async Task Raw_LevelDescriptor_Create_plus_direct_DbContext_Add_persists_content_under_a_locked_version()
+    public async Task Raw_LevelDescriptor_Create_plus_direct_DbContext_Add_is_now_rejected_by_the_db_trigger_HAP7()
     {
         var lockedVersion = await SeedAndLockV1Async();
 
@@ -114,12 +126,56 @@ public sealed class FrameworkLockBypassQaTests
             db.LevelDescriptors.Add(attackerDescriptor);
             var ex = await Record.ExceptionAsync(() => db.SaveChangesAsync());
 
-            Assert.Null(ex);
+            Assert.NotNull(ex);
+            Assert.Contains("FR-054", ex!.ToString());
         }
 
         using var verify = _factory.NewScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<HapDbContext>();
-        Assert.True(await verifyDb.LevelDescriptors.AnyAsync(l => l.Level == 9 && l.DimensionId == targetDimensionId));
+        Assert.False(await verifyDb.LevelDescriptors.AnyAsync(l => l.Level == 9 && l.DimensionId == targetDimensionId));
+    }
+
+    [Fact]
+    [Trait("Category", "PrivacyReporting")]
+    public async Task Raw_UPDATE_reparenting_a_dimension_out_of_a_locked_version_is_rejected_HAP7_L2_round1()
+    {
+        // L2 panel round-1 BLOCKING finding (hap-code-reviewer, empirically proven against a live
+        // Postgres): the original trigger checked only the NEW parent on an UPDATE (NEW is never
+        // null there), so a raw re-parent — UPDATE dimensions SET "FrameworkVersionId" = <unlocked>
+        // WHERE "Id" = <dim-under-locked> — moved a row OUT of a locked version undetected, after
+        // which it was freely mutable/deletable under its new, unlocked parent. Fixed in migration
+        // #3 by checking BOTH the OLD and NEW parent's lock state, gated on TG_OP rather than
+        // COALESCE (which silently preferred NEW and was exactly the gap). This test reproduces the
+        // reviewer's exact exploit via raw SQL — Dimension has no setter, so reflection can't
+        // reproduce it; a raw UPDATE is also the more faithful "bypass everything" reproduction.
+        var lockedVersion = await SeedAndLockV1Async();
+
+        Guid dimensionUnderLockedVersion;
+        Guid unlockedVersionId;
+        using (var scope = _factory.NewScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HapDbContext>();
+            dimensionUnderLockedVersion = (await db.Dimensions.FirstAsync(d => d.FrameworkVersionId == lockedVersion.Id)).Id;
+
+            var admin = scope.ServiceProvider.GetRequiredService<FrameworkAdminService>();
+            var draft = await admin.CreateDraftVersionAsync("ai-maturity-sdlc", sourceRef: "reparent-target");
+            unlockedVersionId = draft.Id; // fresh, unlocked — the re-parent target
+        }
+
+        using (var writeScope = _factory.NewScope())
+        {
+            var db = writeScope.ServiceProvider.GetRequiredService<HapDbContext>();
+            var ex = await Record.ExceptionAsync(() => db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE dimensions SET \"FrameworkVersionId\" = {unlockedVersionId} WHERE \"Id\" = {dimensionUnderLockedVersion}"));
+
+            Assert.NotNull(ex);
+            Assert.Contains("FR-054", ex!.ToString());
+        }
+
+        using var verify = _factory.NewScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<HapDbContext>();
+        var stillOwned = await verifyDb.Dimensions.AsNoTracking().SingleAsync(d => d.Id == dimensionUnderLockedVersion);
+        Assert.Equal(lockedVersion.Id, stillOwned.FrameworkVersionId); // re-parent did NOT stick
     }
 
     [Fact]

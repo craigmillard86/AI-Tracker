@@ -1,4 +1,5 @@
 using Hap.Infrastructure.Audit;
+using Hap.Infrastructure.Cycles;
 using Hap.Infrastructure.Directory;
 using Hap.Infrastructure.Frameworks;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,8 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Hap.Infrastructure;
 
 /// <summary>Registers the HAP infrastructure services (directory port + importer, audit writer,
-/// override service, framework seeder + admin service). Kept out of <c>Program.cs</c> so the
-/// wiring is testable and reusable.</summary>
+/// override service, framework seeder + admin service, cycle service). Kept out of
+/// <c>Program.cs</c> so the wiring is testable and reusable.</summary>
 public static class InfrastructureServiceCollectionExtensions
 {
     public static IServiceCollection AddHapInfrastructure(
@@ -19,6 +20,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<OrgOverrideService>();
         services.AddScoped(sp => new FrameworkSeeder(sp.GetRequiredService<HapDbContext>(), frameworkDefinitionPath));
         services.AddScoped<FrameworkAdminService>();
+        services.AddScoped<CycleService>();
         return services;
     }
 }

@@ -329,3 +329,87 @@ Category=PrivacyReporting, documented to FLIP to `Assert.False` when Q-014 lands
 restrictive. The residual is now a tested, visible fact — not prose-only.
 
 **Status:** **RESOLVED 2026-07-21 — owner-ratified ALLOW → [DR-0005](DR-0005-above-bu-direct-report-read.md).** The owner ruled the one-hop above-BU direct read is **ALLOWED** (a direct line-manager, any tier, reads their immediate direct report for moderation; transitive/broad reads stay aggregates-only). The residual is therefore **ratified intended behaviour, not a leak** — the shipped seam already implements it. **HAP-8 cross-person read block is LIFTED** for the synthetic build (DR-0005). The pinned test now asserts ratified behaviour and does NOT flip; **HAP-8 (next seam-touching story) must reframe its name/comment from "pending Q-014" to "ratified per DR-0005."** Real-data caveat lives with [Q-014] (deferred).
+
+## 2026-07-21 · HAP-7 (cycle management) · Q-016 — BU/framework mapping: no junction table modeled
+
+Root spec (line 158, 311) describes BU registration as selecting "applicable framework(s)" per BU — implying
+a BU↔Framework many-to-many mapping the admin configures. FR-002/FR-003 both say invitations cover "onboarded
+BUs mapped to it [the framework]" / derive from "org sync + BU/framework mapping". But the binding plan
+artifact, data-model.md, models no such table: `BusinessUnit` has no framework field, and `Cycle`/
+`CycleInvitation` reference only `framework_version_id` — there is no BU↔Framework junction anywhere in the
+Data Model doc HAP-7 was told to build from.
+
+**Provisional answer in effect:** since this local build seeds exactly one framework (`ai-maturity-sdlc`,
+HAP-6) and data-model.md — the artifact this story cites as its Files/plan source — models no mapping table,
+"onboarded BUs mapped to the framework" is read as **every onboarded BU** for Phase 1 MVP (the mapping is
+vacuously total with a single framework). HAP-7 does not add a BU↔Framework junction table.
+
+**L2 panel round-1 escalation (hap-domain-specialist):** this is not a cosmetic gap deferred to "someday" — it
+is a **hard blocker for any second-framework story**. Once a second framework is seeded, `CycleService.OpenAsync`
+as shipped will silently over-invite: it invites every active person in every onboarded BU to EVERY framework's
+cycle, with no way to scope a BU to only some of the frameworks it should participate in. This is silent
+over-participation (not a crash, not a test failure) — exactly the kind of drift the constitution's "uncertainty
+rounds up" posture exists to catch before it reaches real data. Whichever story introduces framework #2 MUST
+either (a) add the BU↔Framework junction table to data-model.md and thread it through `CycleService.OpenAsync`'s
+eligibility query, or (b) explicitly re-ratify "every onboarded BU participates in every framework" as intended
+behaviour — it cannot silently inherit HAP-7's single-framework provisional reading.
+
+**Blocks:** nothing locally (single-framework build). **Hard blocker for the first second-framework story** —
+that story cannot proceed on HAP-7's provisional reading without one of the two resolutions above.
+**Owner action:** confirm the single-framework-implies-total-mapping reading, or clarify whether data-model.md
+should gain a BU↔Framework table now, ahead of any second framework.
+**Status:** OPEN (provisional answer in effect; escalated to a hard blocker for the next framework story)
+
+## 2026-07-21 · HAP-7 (cycle management) · Q-017 — Post-close submission lock and cycle-close are primitives, not endpoints; BU onboarding has no write path or audit trail yet
+
+Three related HAP-7 scope-boundary findings, all arising because Assessment/AssessmentScore, the full
+cycle-close orchestration (auto-adoption/snapshots/suppression), and the BU onboarding admin workflow
+referenced by root spec line 31, belong to later stories, not this one:
+
+**(a) Submission lock.** AC 5 requires "score submission is rejected (423/409) unless a late override exists."
+HAP-7's own Files list (`Hap.Domain/**` Cycle state machine, migration #3 Cycle/CycleInvitation, cycle
+endpoints) does not include Assessment/AssessmentScore — those are HAP-8's migration #4 (self-assessment,
+`PUT …/scores`, `POST …/submit`) and HAP-9's moderation endpoints; neither of those stories' own acceptance
+criteria currently mention consulting a late-override grant. HAP-7 therefore ships the LOCK PRIMITIVE only:
+`Cycle.AllowsSubmission(bool hasLateOverride)` (pure domain) plus `CycleService` queries for whether a
+late-override row exists for (cycle, person) — proven by domain/integration tests against those primitives
+directly, not through an actual assessment-submission HTTP call (no such call can exist yet). **HAP-8 and
+HAP-9 must call this primitive when they build their submission/moderation write paths, or post-close
+rejection will silently not exist.** This dependency was not previously recorded in either story's Context.
+
+**(a-addendum, L2 panel round-1 advisory) Close-time handoff.** contracts/api.md documents that
+`POST /api/cycles/{id}/close` runs auto-adoption (FR-068) + rollup snapshots + suppression verdicts (research
+D2/D4) — but HAP-7's `CycleService.CloseAsync` is a bare `Open → Closed` transition; the auto-adoption/snapshot
+work is deferred to HAP-10 (`docs/backlog/HAP-10-cycle-close.md`, migration #5) in a code comment only, the
+same silent-drop risk (a)'s late-override handoff had before this note. **HAP-10 must hook its auto-adoption +
+snapshot + suppression-freeze logic directly into `CycleService.CloseAsync`** (or a wrapper that still runs the
+Open→Closed transition through it) rather than building a parallel close path — mirrored here exactly as (a)'s
+submission-lock handoff was, so it is not silently dropped either.
+
+**(b) BU onboarding — write path.** `BusinessUnit.IsOnboarded` (HAP-3) is set `false` at `Create()` and never
+mutated anywhere in the codebase — no admin endpoint exists to onboard a BU, even though root spec line 31
+lists "BU onboarding" as a Platform Admin capability and HAP-7's own AC 3 (mid-cycle onboarding test) requires
+onboarding a BU as test setup. No other backlog story currently owns this write path. HAP-7 adds a minimal
+`BusinessUnit.SetOnboarded(bool)` + `[PA] POST /api/admin/business-units/{id}/onboard` since it is required to
+make HAP-7's own acceptance criteria testable and fits the story's already-stated file scope
+(`Hap.Domain/**` + "endpoints in `Hap.Api`").
+
+**(b-elevation, L2 panel round-1, hap-domain-specialist) BU onboarding — audit trail is a future L3 obligation,
+not a HAP-7 gap to close now.** Every other admin mutation in this codebase writes an `AuditLog` row (org
+overrides, role grants); this one does not, because no `AuditAction` case fits "BU onboarded" and none of
+HAP-7's cited FRs call for one. Constitution Art. VI.4 requires Harris submission figures to reconcile to
+underlying records, and `IsOnboarded` directly gates which people feed cycle participation/completion figures
+that ultimately reconcile into those submissions. **HAP-7 deliberately does NOT add the audit row here** —
+doing so would pull an L2 story into the L3 audit-write path (`Hap.Infrastructure/Audit/**`) for an advisory
+fix disconnected from any current reconciliation consumer. Instead: **whichever Wave-2 story first makes the
+`IsOnboarded` flag feed a reconciled participation or Harris figure MUST add an `AuditLog` row (a new
+`AuditAction` case) to the onboarding write path as part of that story, and that addition is L3** (it touches
+Harris submission generation's aggregation inputs) **regardless of how small the mutation itself looks.**
+
+**Blocks:** nothing locally — all three are additive/deferred obligations, not open defects. **Owner action:**
+confirm (a) HAP-8/HAP-9 story files should be updated to cite the late-override consult obligation, (a-addendum)
+HAP-10's story file should be updated to cite the CloseAsync hook-in obligation, (b) the BU-onboarding endpoint
+belongs here rather than a dedicated future story, and (b-elevation) the audit-row obligation is correctly
+assigned to the future Wave-2 story that first reconciles the flag, not retrofitted here.
+**Status:** OPEN (provisional answers in effect; HAP-7 proceeds on all three; (a-addendum) and (b-elevation)
+are forward obligations on HAP-10 and a future Wave-2 story respectively)
