@@ -12,4 +12,10 @@
     <ProjectReference Include="..\Hap.Infrastructure\Hap.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- The test project verifies the seam's internal structural reader-classification helper directly
+       (Q-014: derivation must be structural). Keeps the helper internal rather than public API. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hap.Api.Tests" />
+  </ItemGroup>
+
 </Project>

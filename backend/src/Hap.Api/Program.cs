@@ -1,4 +1,5 @@
 using Hap.Api;
+using Hap.Api.Authorization;
 using Hap.Api.Identity;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Frameworks;
@@ -39,6 +40,10 @@ var seedUsersPath =
     ?? Path.Combine(AppContext.BaseDirectory, "seed-users.json");
 
 builder.Services.AddHapIdentity(seedUsersPath);
+
+// The visibility seam (CLAUDE.md §2). Foundation services only for now; the assessment-read gateway
+// comes online with HAP-8's DbSet-backed store.
+builder.Services.AddHapAuthorization();
 
 var app = builder.Build();
 

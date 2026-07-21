@@ -213,3 +213,121 @@ This is a G1 precondition, not a nice-to-have — G1's own bar is "zero leaks," 
 misassignment is exactly the shape of leak G1 exists to catch.
 **Status:** OPEN — owner ratification required before real-data onboarding AND before any story builds
 visibility scope on these labels; provisional remains in effect for the synthetic local build only.
+
+## 2026-07-21 · spec 001 / HAP-5 · Q-015 — Does the FR-025 "above-BU leaders see aggregates only" cap bind an above-BU leader who is genuinely in a subject's line-management chain?
+
+FR-025 has two clauses: (1) individual-level assessment data is readable by "the individual, their manager,
+and those above them in the management chain"; (2) "Leaders above BU level see aggregates only." In HIG's
+single-tree org model these clauses overlap: a Group Leader / Portfolio Leader / HIG Executive sits ABOVE a
+BU member in that member's own upward management chain (member -> team lead -> director -> BU Lead -> Group
+Leader -> ...). So clause (1) read literally grants those above-BU leaders individual-score access, while
+clause (2) says they get aggregates only. To honour clause (2) the seam must CAP individual reads at the
+BU-Lead tier — but identifying "the BU-Lead tier boundary" in the chain is exactly the unratified
+depth-derivation of **Q-014** (the BU01 collapse defeats every structural BU-boundary heuristic: BU01 homes
+Exec, Portfolio Leader, Group Leader and BU Lead simultaneously, so "same BU as the subject" cannot
+distinguish the BU-Lead ceiling from the leaders above it). Group Leader / Portfolio Leader also have **no**
+explicit RoleGrant and **no** ratified structural anchor today, so the seam cannot even identify them as
+above-BU leaders to exclude them.
+
+**Provisional answer in effect (per CLAUDE.md §6.3; uncertainty rounds up, but bounded by what is
+structurally possible without Q-014):** the HAP-5 seam grants individual-score reads **only** through the
+transitive management chain (self + upward ancestors, **excluding contractor managers** per Q-006), which is
+fully structural and Q-014-independent. `RoleScope` grants the Group Leader / Portfolio Leader / HIG
+Executive / Platform Admin roles **no individual-read capability by construction** (AC-2 / FR-025 clause 2 at
+the role-scope layer) — the gateway never derives individual access from a role, only from the chain. The
+residual consequence: an above-BU leader who is *also* a genuine line-management ancestor of a subject
+retains individual access **via the chain** (clause 1), because capping that at the BU-Lead tier requires the
+Q-014 structural anchor. This is a deliberate, documented deferral — the seam is structured so the cap drops
+in as a single predicate once Q-014 ratifies a "leads this unit" anchor.
+
+**Blocks:** nothing locally (synthetic data; SC-005's own bar is "zero reads *outside* the chain", which the
+chain rule enforces exactly). **This is a G1 precondition:** G1 witnesses every seeded role attempting
+individual-score access, and whether an in-chain above-BU leader should be capped is precisely an
+owner/DPIA call to make there. HAP-5's L3 red-team is asked to rule on whether the chain-only grant is an
+acceptable interim posture or whether the seam must instead deny ALL transitive (non-direct-manager) reads
+until Q-014 lands (the more restrictive alternative, which would also under-grant legitimate BU-Lead access).
+**Status:** SUPERSEDED by the L3 ruling below (the chain-only provisional was found to over-grant and was
+reversed in-story).
+
+### Q-015 ruling — 2026-07-21, HAP-5 L3 panel round 1 (session-lead adjudication, binding)
+
+The panel split. `hap-domain-specialist` BLOCKED on the over-grant (everything else spec-faithful);
+`hap-code-reviewer` CHANGES-REQUIRED (this + a record note; code otherwise clean); `hap-red-team` SIGN-OFF
+conditional (finding real but deferrable with a G1 flag). Both reviewers confirmed the concrete leak: the
+gateway's `AuthorizeIndividualRead` consulted only the chain and never `RoleScope`, so an above-BU leader —
+a chain ancestor of ~everyone below them in the single-tree org — got individual reads FR-025 clause 2
+forbids (e.g. `GrantsIndividualRead(HAP-GRP-01, HAP-SEED-IND) = true`). `RoleScope.AllowsIndividualRead`
+already computed `false` for those roles but was **dead code**, never wired into the gateway.
+
+**Session-lead ruling (fix-now restrictively; defer only the Q-014-bound edge, fail-closed).** The over-grant
+has two separable parts:
+
+- **PART 1 — the GROSS transitive over-grant is closed now (does NOT need Q-014):** an above-BU leader reading
+  individuals several hops down their subtree. The gateway now requires BOTH the chain grant AND the reader's
+  structurally-derived role carrying `RoleScope.AllowsIndividualRead = true`, AND the subject within reach
+  (Manager ⇒ DIRECT reports only). This does NOT break cross-BU or direct-manager reads (Manager / BU-delegate
+  keep the capability). The reader's role is derived STRUCTURALLY — explicit `RoleGrant` (HigExecutive /
+  PlatformAdmin / GroupViewer disqualify; BuDelegate = within-BU) then org position (has active direct reports
+  ⇒ Manager, else Individual) — NEVER from `HierarchyRoleResolver` depth labels (Q-014).
+  **⚠ Scope of "denied even as an ancestor" — corrected in round 3 (see below):** this holds for
+  Exec/PlatformAdmin (explicit grants) and for all TRANSITIVE (2+ hop) reads, but NOT for the one-hop
+  direct-report read by an ungranted hierarchy Portfolio/Group Leader — see the round-3 correction.
+
+- **PART 2 — deferred, fail-closed (genuinely Q-014-bound):** the fine residual — a hierarchy BU Lead who,
+  because of BU01-collapse, is structurally an ancestor of people outside their true BU. Identifying
+  "above-BU" precisely is exactly Q-014. The seam does NOT attempt the full structural cap. Where the reader's
+  role/scope is structurally AMBIGUOUS such that a within-BU read cannot be PROVEN without Q-014, the gateway
+  FAILS CLOSED (denies): an ungranted transitive (skip-level / BU-wide) read is refused. A hierarchy BU Lead
+  gets BU-wide reads only via an explicit `BuDelegate` grant covering the subject's BU (or once Q-014 ratifies
+  a "leads this unit" anchor). This is a **hard G1 precondition**: **HAP-8 MUST NOT wire a live individual-read
+  endpoint until the BU-tier cap lands, and G1 cannot certify until Q-014/Q-015 resolves it.** (Copied into
+  the HAP-8 story Context.)
+
+`hap-red-team`'s explicit warning was honoured: the seam does NOT adopt "deny ALL transitive reads" as a blunt
+rule — direct-manager reads (incl. cross-BU) and BuDelegate-scoped BU-wide reads still work; only
+un-attributable transitive reads fail closed.
+
+**Blocks:** nothing locally (synthetic data). G1 precondition as above; HAP-8 endpoint-wiring precondition as
+above.
+**Status:** RESOLVED for the seam (PART 1 implemented + tested, Category=PrivacyReporting); PART 2 deferred to
+Q-014 with a documented fail-closed posture and G1/HAP-8 preconditions. **See the round-3 correction below —
+the residual is larger than PART 1's first wording implied and the true extent is now recorded.**
+
+### Q-015 correction — 2026-07-21, HAP-5 L3 panel round 3 (hap-red-team, corroborated by domain + code)
+
+Round-2 panel: `hap-domain-specialist` SIGN-OFF, `hap-code-reviewer` SIGN-OFF, `hap-red-team` BLOCKED — but the
+block was **false assurance in the record, not a code defect** (all three reviewers judged the CODE correct).
+Ruling: correct the record, expand the G1 witness, pin the behavior with a test. The authorization algorithm
+is unchanged.
+
+**The true residual (accurately stated).** Hierarchy above-BU leaders (Portfolio Leader, Group Leader) are
+NEVER seeded an explicit `OrgRole` grant — only "Platform Admin" and "HIG Executive" get explicit grants. So
+`ClassifyReader` falls them through `HasDirectReports` → **Manager**, and they CAN read the individual scores
+of their **IMMEDIATE DIRECT reports**:
+`AuthorizeIndividualRead(Ungranted(HAP-GRP-01), HAP-BUL-01) = ALLOWED` (Group Leader → direct-report BU Lead);
+`AuthorizeIndividualRead(Ungranted(HAP-PF-01), HAP-GRP-01) = ALLOWED` (Portfolio Leader → direct-report Group
+Leader). Only the TRANSITIVE / subtree read (2+ hops) is closed; the one-hop direct-report read by an above-BU
+hierarchy leader is **NOT** closed. PART 1's "above-BU roles denied even as a genuine ancestor" is therefore
+true only for Exec/PlatformAdmin and for transitive reads — **false for the hierarchy tiers at one hop.**
+
+**Why the code stays (all three reviewers agree).** Distinguishing a hierarchy Group Leader from an ordinary
+Manager — both simply "have direct reports" — needs the Q-014 "leads this unit" anchor. The only code
+alternative is denying ALL ungranted direct-manager reads, which breaks the core FR-025 clause-1 manager grant
+(the over-restriction `hap-red-team` explicitly warned against). Domain's reading: the direct-report read is a
+LEGITIMATE one-hop manager-review relationship (a BU Lead is themselves an assessment subject who needs a
+moderating manager). Whether clause-2 should ALSO deny that direct read is a **genuine spec ambiguity and an
+OWNER decision at G1** — not resolvable in code now.
+
+**G1 precondition — expanded (binding).** The owner must specifically rule: *does an above-BU hierarchy leader
+(Portfolio/Group) get to read their immediate direct report's individual score, or aggregates only?* The G1
+witness script MUST include `HAP-PF-01 → HAP-GRP-01` and `HAP-GRP-01 → HAP-BUL-01` and show they currently
+return **Allowed**, so the owner sees the actual behavior and decides whether it is acceptable or must flip to
+denied once Q-014 supplies the anchor. (Recorded into HAP-12 — the G1/audit story — Context.)
+
+**Pinned by test.** `OrgGraphRealDirectoryTests.PINNED_ungranted_above_BU_hierarchy_leader_CAN_read_immediate_
+direct_report_pending_Q014_G1` asserts the current ALLOW for both cases (and the transitive DENY as contrast),
+Category=PrivacyReporting, documented to FLIP to `Assert.False` when Q-014 lands and the owner rules
+restrictive. The residual is now a tested, visible fact — not prose-only.
+
+**Status:** RECORD CORRECTED. Code unchanged (round-2 domain + code sign-offs stand over this docs+test delta).
+Residual honestly recorded + pinned; owner ruling on the one-hop above-BU direct read is a G1 decision.

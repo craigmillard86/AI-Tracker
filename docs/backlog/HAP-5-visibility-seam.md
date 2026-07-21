@@ -5,9 +5,11 @@ epic: E1-foundations
 wave: 0
 fr: [FR-014, FR-025, FR-071]
 risk: L3                # trigger: role-scope/visibility predicates + N<4 suppression logic (the seam itself)
-status: todo
+status: qa
 estimate: {dev: L, qa: M}
-worklog: []
+worklog:
+  - {phase: dev, start: 2026-07-21T19:39:53Z, end: 2026-07-21T20:55:21Z, mins: 76}
+  - {phase: qa, start: 2026-07-21T21:01:06Z, end: 2026-07-21T21:12:48Z, mins: 12}
 closure: null
 ---
 ## Story
@@ -39,3 +41,130 @@ As the platform, every read of assessment data must pass through one authorisati
 
 **SPEC AUDIT 2026-07-21 (pre-start edit, story was todo):** clarified no-DbSet-before-migration sequencing (verify idempotence hazard); added cross-BU chain and contractor-manager (Q-006) test cases.
 **L2 PANEL B2 (same day):** contractor-manager default reversed permissive → RESTRICTIVE (excluded + escalation, config-flagged) pending Q-006 ratification — a safeguarding seam rounds up; the L3 panel and red-team for this story must still treat Q-006 as open.
+
+**DEV (dev-hap-5) 2026-07-21 — design decisions, provisional answers, and Q-014/Q-025 posture:**
+- **Structural role-scope, NOT depth labels (Q-014):** `RoleScope` is built from BU/Group/Portfolio FK membership + explicit `RoleGrant` rows. It never consumes `HierarchyRoleResolver`'s depth-derived tier labels. Individual-score reads are decided **solely** by `ChainResolver` (transitive management chain), which is structural (`Person.ManagerPersonId`) and Q-014-independent.
+- **Q-015 raised (FR-025 clause tension):** in HIG's single-tree org an above-BU leader also sits in a subject's line chain, so FR-025 clause 1 (chain grants read) and clause 2 (above-BU = aggregates only) overlap. Capping in-chain reads at the BU-Lead tier needs the Q-014 anchor (BU01 collapse defeats every structural heuristic). **Provisional in effect:** individual reads follow the chain (minus contractor managers); `RoleScope` gives Group/Portfolio/Exec/Admin **no** individual-read capability by construction; the BU-tier cap on in-chain above-BU leaders is deferred to Q-014 and flagged for G1. Red-team asked to rule (QUESTIONS.md Q-015).
+- **Contractor-manager RESTRICTIVE (Q-006):** `SeamOptions.ContractorManagerPolicy` defaults `Restrictive` — a contractor manager is excluded from the individual-read grant for their reports; the chain still walks THROUGH them so their own managers retain access; escalation (`ReviewerOfRecord`/`EscalationManager`) resolves to the first non-contractor ancestor (FR-070). Config-flag flip to `Permissive` is a later L3 change.
+- **No DbSet / no migration (audit constraint):** `Assessment`/`AssessmentScore` are defined as seam-internal types in `Hap.Api.Authorization`; the `AssessmentReads` gateway authorises then delegates to an `IAssessmentStore` port (HAP-8 implements it against DbSets + migration). Fully unit-tested now on the org side via a fake store: the gateway must never call the store for an unauthorised read. **HAP-8 handoff:** to register `DbSet<Assessment>` on `HapDbContext` (Hap.Infrastructure) without a layer inversion, HAP-8 relocates these types to `Hap.Domain` and extends the architecture guard's allowlist to the domain definition folder + the seam.
+- **Cycle-safe walk:** `ChainResolver` walks with a visited-set AND a depth cap (no acyclicity assumption); proven against a synthetic 2-cycle fixture (Category=PrivacyReporting).
+- **[PA] admin gate (AC-6):** already shipped by HAP-4 (`AdminEndpoints` + `PlatformAdmin` policy). This story adds a parameterised all-seven-roles confirmation test only; it does not re-implement the gate.
+
+**DEV round 1 — verify green (2026-07-21):** `./scripts/verify.sh` ALL GREEN (exit 0). Backend: Api.Tests 150, Architecture.Tests 8, Domain 21, Synth 41 (Failed:0). `Category=PrivacyReporting` suite [6/9]: Api.Tests 74 + Architecture.Tests 4 (Failed:0). Frontend lint/typecheck/test/build green; no external font. Handed to the L3 panel.
+
+**L3 PANEL ROUND 1 (2026-07-21) — verdicts:**
+- `hap-domain-specialist`: **BLOCKED** on the Q-015 over-grant; everything else spec-faithful sign-off (suppression math, chain edges, FR-071, Q-006).
+- `hap-code-reviewer`: **CHANGES REQUIRED** — 1 blocking record note (append the verify run + panel verdicts to the story); code otherwise zero-defect. Advisories applied (below).
+- `hap-red-team`: **SIGN-OFF (conditional)** — Q-015 real but deferrable with a G1 flag; explicit warning NOT to adopt "deny all transitive reads".
+
+**Q-015 RULING (session lead, binding) — implemented in round 2.** The gateway over-granted: `AuthorizeIndividualRead` consulted only the chain, never `RoleScope`, so an above-BU chain ancestor got individual reads (`GrantsIndividualRead(HAP-GRP-01, HAP-SEED-IND)=true`); `RoleScope.AllowsIndividualRead` was dead code. Fix split:
+- **PART 1 (gross transitive over-grant closed now):** an individual read now requires BOTH the chain grant AND the reader's structurally-derived role carrying `RoleScope.IndividualReadCapability(role).AllowsIndividualRead=true`, AND the subject within reach. Reader role derived STRUCTURALLY: explicit `RoleGrant` (HigExecutive/PlatformAdmin/GroupViewer disqualify; BuDelegate ⇒ within-BU) then org position (`OrgGraph.HasDirectReports` ⇒ Manager, else Individual) — never depth labels (Q-014). New `CallerContext`/`CallerGrant` carry the (DB-re-read, HAP-4 A3) grants. **⚠ round-3 correction (see below): "denied even as an ancestor" holds for Exec/PlatformAdmin and all TRANSITIVE reads, but an ungranted hierarchy Portfolio/Group Leader is classified `Manager` and CAN still read their IMMEDIATE DIRECT report — that one-hop residual is Q-014/G1-bound.**
+- **PART 2 (deferred, fail-closed):** the BU01-collapse residual (a hierarchy BU Lead ancestor of people outside their true BU) needs Q-014. The gateway grants only provably-within-BU reads: DIRECT-manager (incl. cross-BU, minus contractor) and BuDelegate-scoped BU-wide. An ungranted transitive read FAILS CLOSED. Recorded as a G1 precondition + HAP-8 endpoint-wiring block (QUESTIONS.md Q-015 ruling; copied to HAP-8 Context). Red-team's warning honoured — direct + BuDelegate reads still work; only un-attributable transitive reads are denied.
+
+**ADVISORIES APPLIED (round 2):**
+- `SuppressionEvaluator.EvaluateNode` (the public pairwise footgun) **removed**; the set-based `EvaluateLevel` is now the only publication path. Tests reworked onto it.
+- `EvaluateLevel` now **throws** on a negative complement (children sum > parent — corrupt hierarchy) as a data-integrity tripwire.
+- `AdminGateAllRolesTests` extended to the full `[PA]` matrix: sync, overrides (GET+POST), frameworks (GET+POST) across all seven roles.
+- `SeamBoundaryTests` gains a **canary** asserting the real `RepoSource.CsFiles` scan yields matchable content (non-vacuous guard).
+- **`SeamOptions.ContractorManagerPolicy` posture (accepted decision, not drift):** it is a DI code default (`Restrictive`), not an appsettings-bindable flag — the code reviewer judged this SAFER than a runtime-flippable config (no ambient flip of a safeguarding default); the panel accepted it. A flip to `Permissive` is a reviewed L3 code change.
+- Testing the internal structural classifier required `InternalsVisibleTo("Hap.Api.Tests")` on `Hap.Api` (keeps `ClassifyReader` internal rather than public API).
+- NOT built (deferred, per ruling): `AggregateOutcome.Suppressed` direct-serialisation guard + reason-enum public-vs-audit → rollup story; time-series/composition differencing → G2; MSB3277 EFCore 8.0.4-vs-8.0.8 conflict → the scheduled L2 dependency story (versions NOT bumped here).
+
+**DEV round 2 — verify green (2026-07-21):** `./scripts/verify.sh` ALL GREEN (exit 0). Backend: Api.Tests 157, Architecture.Tests 9 (Failed:0). `Category=PrivacyReporting` suite [6/9]: Api.Tests 81 + Architecture.Tests 5 (Failed:0). Frontend green. Re-review requested (fix touches the seam authorization path → stays L3 → full panel).
+
+**L3 PANEL ROUND 2 (2026-07-21) — verdicts:** `hap-domain-specialist` **SIGN-OFF**; `hap-code-reviewer` **SIGN-OFF**; `hap-red-team` **BLOCKED** — but the block is **false assurance in the record, not a code defect** (all three reviewers judged the code correct). Session-lead ruling: correct the record, expand the G1 witness, pin the behavior with a test — do NOT change the algorithm.
+
+**ROUND 3 — record correction (no algorithm change).** The true residual of PART 1, stated accurately: hierarchy above-BU leaders (Portfolio/Group) get NO explicit `OrgRole` grant (only Platform Admin + HIG Executive do), so `ClassifyReader` falls them through `HasDirectReports` → **Manager**, and they CAN read their **IMMEDIATE DIRECT report's** individual score — `AuthorizeIndividualRead(Ungranted(HAP-GRP-01), HAP-BUL-01)=ALLOWED`, `AuthorizeIndividualRead(Ungranted(HAP-PF-01), HAP-GRP-01)=ALLOWED`. Only the TRANSITIVE (2+ hop) read is closed; the one-hop above-BU direct read is NOT. PART 1's "denied even as a genuine ancestor" is true only for Exec/PlatformAdmin and transitive reads. Distinguishing a hierarchy Group Leader from an ordinary Manager needs the Q-014 anchor; denying ALL ungranted direct reads would break the FR-025 clause-1 manager grant (red-team's explicit warning). Whether clause-2 should deny the one-hop above-BU direct read is a genuine spec ambiguity → **G1 OWNER DECISION**. Actions taken (record + witness + test only):
+- Corrected the PART-1 wording everywhere it appears (this file, QUESTIONS.md Q-015 ruling, HAP-8 Context).
+- Expanded the G1 precondition + witness: QUESTIONS.md Q-015 round-3 correction; HAP-12 (G1 story) Context now requires the V3 spot-checks to show `HAP-PF-01→HAP-GRP-01` and `HAP-GRP-01→HAP-BUL-01` as currently ALLOWED for the owner to rule on.
+- Added the **pinning test** `OrgGraphRealDirectoryTests.PINNED_ungranted_above_BU_hierarchy_leader_CAN_read_immediate_direct_report_pending_Q014_G1` (Category=PrivacyReporting) asserting the current ALLOW + the transitive DENY contrast, documented to FLIP to `Assert.False` when Q-014 + an owner-restrictive G1 ruling land.
+
+**ROUND-2 ADVISORIES FOLDED IN (record-only, per ruling — NOT built):**
+- Domain A2 — **intentional decision recorded:** a `HigExecutive`-granted reader loses even a single-hop direct-report read through this gateway. That is intentional (restrictive; no exec manager-review workflow routes through the assessment-read seam). A flip is an owner/L3 change.
+- Domain A1 + code — handoff: `BuDelegate` has no live grant-seeding path yet, so the "BU Lead sees their whole BU" row is code-correct but unreachable in practice until the RoleGrant-assignment story ships a seeding path. Recorded for that story.
+- Code — handoff (existence-leak): the gateway's deny `Reason` strings (incl. "subject is not in the org graph") are AUDIT-ONLY diagnostics; when HAP-8+ wire endpoints, responses MUST follow the existence-leak rule (403/404 per contracts/api.md), never surfacing a distinguishable "not found" oracle.
+- Code — handoff: `ClassifyReader` uses `FirstOrDefault` for `BuDelegate`, so a reader delegated to MULTIPLE BUs is under-granted to the first — fine now (no multi-BU delegates), flagged for the multi-BU/rollup story.
+- Code — note: the explicit root-node (`parentN: null`, top-of-hierarchy) suppression case lost its dedicated unit test when `EvaluateNode` was removed; the top-level aggregate is trivially published at n≥4, but the rollup story should restore an explicit assertion.
+
+**DEV round 3 — verify green (2026-07-21):** `./scripts/verify.sh` ALL GREEN (exit 0) — see the round-3 report; the pinning test passes as an ALLOW-assertion. Record + test delta only; code unchanged since round 2.
+
+**L3 PANEL — COMPLETE, ALL THREE SIGN-OFFS (2026-07-21):**
+- `hap-red-team`: **SIGN-OFF** (round 3) — ran the pinning test green on a provisioned Postgres itself; the residual is now honestly recorded and the G1 witness is sufficient. Round-2 BLOCK lifted (it was false-assurance-in-the-record, not a code defect).
+- `hap-domain-specialist`: **SIGN-OFF** (round 2, stands — the round-3 delta is docs+test over byte-identical code).
+- `hap-code-reviewer`: **SIGN-OFF** (round 2, stands — same).
+Panel evidence at: code `55f9377` (round-2 fix) / docs+test `64288fd` (round-3 correction).
+
+**STANDING PRECONDITIONS (recorded, NOT self-certifiable — carried to closure):**
+- **G1** is gated on the owner's ruling on the one-hop above-BU-hierarchy-leader DIRECT-report read (Q-015); the G1 witness must show `HAP-PF-01→HAP-GRP-01` and `HAP-GRP-01→HAP-BUL-01` as currently ALLOWED (HAP-12 Context + QUESTIONS.md Q-015).
+- **HAP-8** must NOT wire a live cross-person individual-read endpoint until the Q-014/Q-015 BU-tier cap lands (HAP-8 Context).
+
+**DEV CLOCK-OUT (2026-07-21):** measured wall-clock 76 min (start 2026-07-21T19:39:53Z → end 2026-07-21T20:55:21Z), spanning three L3 panel rounds incl. the Q-015 adjudication. Far below the `dev: L` (3d human-equivalent) estimate — the expected AI-agent-vs-human-equiv calibration gap, logged as measured, not shaved. Status → qa; QA is a fresh `hap-qa` spawn (adversarial, L3 seam brief).
+
+---
+
+## QA (hap-qa, fresh instance, 2026-07-21) — adversarial red-team brief
+
+No shared context with Dev. Re-derived correctness from this file, the FRs, and the running code only. Worked in `C:\git\hap-worktrees\HAP-5` on `HAP-5-fr-014-visibility-seam`, tip `6fac407` at start.
+
+### Acceptance-criterion clauses — verdict
+
+1. **ChainResolver edge cases** — PASS. Verified by reading `ChainResolver.cs` against every existing `ChainResolverTests.cs` case (manager gap, dangling ref, on-leave, departed/inactive manager + escalation, cross-BU, contractor-manager Restrictive + Permissive, 2-cycle, self-loop) and confirmed each assertion matches the code by hand-tracing the walk. Extended with a 3-node cycle and a depth-cap-on-acyclic-data test (below) — the AC's proof fixture is a 2-cycle; QA generalises it.
+2. **RoleScope seven-role parameterised matrix** — PASS. `RoleScopeTests.cs` `Only_within_BU_roles_may_reach_individual_data` theory covers all seven `SeamRole` values; `IndividualReadCapability` in `RoleScope.cs` is a pure switch confirmed to return `AllowsIndividualRead=false` for GroupLeader/PortfolioLeader/HigExecutive/PlatformAdmin by construction (compile-time exhaustive switch, no default fallthrough to `true`).
+3. **Suppression D2 exhaustive cases** — PASS. All five named cases (n=3 team, sub-4 BU, single-team-BU complement, 4-in-7 complement, 4+4+4 unsuppressed) present and green in `SuppressionTests.cs`. QA added boundary-value pairs at the exact 3/4 edges (below) — all held.
+4. **FR-071 suppressed wire shape** — PASS. `SuppressedCell` has exactly two JSON properties (`suppressed`, `reason`), `AggregateOutcome.Suppressed` carries no numeric field at the type level (compile-time guarantee, not just a serialisation convention) — confirmed by reading `Suppression.cs:23-53`.
+5. **Architecture guard (seam boundary)** — PASS. Confirmed `RepoSource.CsFiles()` scans only `backend/src` (not `backend/tests`), so the guard's own test-file references to `AssessmentScore` don't self-trip; grepped `backend/src` directly for `\bAssessments?\b|\bAssessmentScores?\b` and confirmed the ONLY two production files naming the types are `Hap.Api/Authorization/AssessmentReads.cs` and `Hap.Api/Authorization/AssessmentData.cs` — both inside the seam. Guard is non-vacuous (canary test) and proven to catch a synthetic leak (negative-case test).
+6. **`[PA]` admin gating, all seven roles** — PASS. `AdminGateAllRolesTests.cs` sweeps sync/overrides(GET+POST)/frameworks(GET+POST) across all six non-admin roles (403) plus admits Platform Admin.
+7. **Cycle-safe chain walk** — PASS. Visited-set + depth-cap (`MaxChainDepth=64`) confirmed independent backstops — QA proved the depth cap fires even on a non-cyclic 100-node chain (a case the visited-set alone would not stop), see new test below.
+8. **`./scripts/verify.sh` green** — PASS, see Verify run below.
+9. **QA red-team brief** — this section. Outcome: **no violation beyond the documented, ratified Q-015 residual found; the residual's exact shape is confirmed and could not be widened.**
+
+### §9.3 mandatory adversarial attempts — attempt + outcome (every one is a live test, not a claim)
+
+**(a) Read a score outside the chain, as each of the seven seeded roles**, against the REAL synthetic directory (`OrgGraphRealDirectoryTests.cs`, `SyncCanonicalAsync` + `OrgGraphLoader`):
+- **Individual** (`HAP-SEED-IND`, ungranted): attempted to read their own manager (`HAP-SEED-MGR`) and a stranger several hops up (`HAP-BUL-01`) → **both DENIED**.
+- **Manager** (`HAP-SEED-MGR`, ungranted): attempted a skip-level read of their own manager (`HAP-BUL-01`) and a peer's report (`HAP-EDGE-XBU-REPORT`, who reports to `HAP-BUL-01`, not to `HAP-SEED-MGR`) → **both DENIED**.
+- **BU Lead** (`HAP-BUL-01`, ungranted): attempted the transitive BU-wide read of `HAP-SEED-IND` without a `BuDelegate` grant → **DENIED** (pre-existing dev test, re-verified by re-reading the assertion and the code path together — fail-closed per Q-015 PART 2).
+- **Group Leader** (`HAP-GRP-01`, ungranted, no explicit `OrgRole` grant — confirmed the synth generator seeds Group/Portfolio leaders with none): attempted (i) their documented one-hop direct report `HAP-BUL-01` → **ALLOWED** (the recorded residual, expected); (ii) a BU Lead in a DIFFERENT group, `HAP-BUL-05` (group 2, not their group 1) → **DENIED** — this is the widening attempt, and it failed to widen.
+- **Portfolio Leader** (`HAP-PF-01`, ungranted): attempted (i) their documented one-hop direct report `HAP-GRP-01` → **ALLOWED** (recorded residual); (ii) a Group Leader OUTSIDE their portfolio, `HAP-GRP-03` (portfolio 2, not portfolio 1 — confirmed by the `portfolioOfGroup` arithmetic: groups 1-2→portfolio 1, 3-4→portfolio 2, 5-6→portfolio 3) → **DENIED**; (iii) an ordinary individual four hops down, `HAP-SEED-IND` → **DENIED**; (iv) the pre-existing pinned test's 2-hop case (`HAP-BUL-01`) re-confirmed **DENIED**.
+- **HIG Executive** (`HAP-EXEC`, granted): attempted to read their OWN direct report — `HAP-PF-01` genuinely reports to `HAP-EXEC` — the single most favourable case an Exec could have → **DENIED**. Confirms `RoleScope.IndividualReadCapability(HigExecutive)=(false, None)` is unconditional, not merely "denied when transitive."
+- **Platform Admin** (`HAP-ADMIN`, granted): attempted to read their own direct manager `HAP-BUL-01` (Admin is homed under BUL-01 in the generator) and an unrelated stranger `HAP-SEED-IND` → **both DENIED**.
+
+**Result: zero reads outside the chain succeeded, beyond the one already-documented, owner-flagged residual — and that residual could NOT be extended to a 2nd hop, a non-direct-report, or a cross-branch (different group/portfolio) target in any attempt.** This directly answers the assignment's core question: **the above-BU residual is EXACTLY one-hop-direct.**
+
+**(b) Defeat N<4 + complement suppression by differencing** (`SuppressionTests.cs`):
+- Boundary-value pair at the rule-2 edge: complement of exactly 4 (parent 8, child 4) → **published** (safe); complement of exactly 3 (parent 7, child 4) → **suppressed**. Confirms the `<4` vs `>=4` boundary is exactly where the code says it is, not off-by-one.
+- Boundary-value pair at the rule-1 edge in isolation: own-n of exactly 3 → suppressed; exactly 4 → published (large parent so rule 2 never fires).
+- Multi-child differencing with TWO simultaneous below-threshold children: parent 15, children (3, 3, 9) — attempted to see whether the evaluator mishandles a compound complement (would it publish 9 and thereby expose 15-9=6 as "the other two people's combined figure," a class of leak worse than the existing single-below-threshold case)? → both 3s correctly suppressed `BelowThreshold`, complement recomputed as 15-9=6 (≥4, safe) → 9 correctly **published**. No leak.
+- Repeated-identical-query attack: called `EvaluateLevel` twice with byte-identical input and diffed the two `IReadOnlyDictionary<Guid, AggregateOutcome>` results by value → **identical every time** (pure function, no hidden state, nothing to average across repeated calls).
+- **No recoverable <4 figure found in any attempt.**
+
+**(c) Make a rollup/aggregate disagree with its underlying membership** — **N/A, examined and explained, not skipped.** `SuppressionEvaluator.EvaluateLevel` is a pure function with no live caller wiring a real BU→Group→Portfolio rollup pipeline yet (confirmed: no endpoint, no `IAssessmentStore` consumer beyond the gateway's fake/counting stores in tests) — there is no aggregate-vs-record reconciliation surface to attack today. This is consistent with the dev round-2 advisory ("time-series/composition differencing → G2" and "rollup story" scope) already recorded in this file. Re-verified this is genuinely absent (not merely unlinked) by grepping `backend/src` for any caller of `SuppressionEvaluator.EvaluateLevel` outside its own DI registration — none exists.
+
+**(d) Contractor-manager RESTRICTIVE default** — confirmed AND actively attacked for a bypass, not just re-read:
+- Direct re-verification: `Contractor_manager_is_denied_reading_their_own_report` and the real-directory `Contractor_manager_is_denied_but_an_employee_bu_delegate_above_reads_the_report` both green — contractor excluded, non-contractor ancestor's access preserved, escalation (`ReviewerOfRecord`) resolves past the contractor.
+- **NEW attack**: does an explicit `BuDelegate` grant over the contractor's OWN BU let `ClassifyReader`'s grant-first branch launder them past the exclusion (since grants are checked before `HasDirectReports`, and `ReaderEligible`'s contractor check is a SEPARATE, later gate)? Constructed `CallerContext(ctr, [CallerGrant(BuDelegate, BU1)])` and called `AuthorizeIndividualRead` for their own direct report → **DENIED**, store never queried (`CountingStore.Calls==0`). The `ReaderEligible` check is correctly independent of `ClassifyReader`'s role — no grant can launder a contractor past the Restrictive exclusion.
+
+**(e) Seam boundary — can any code path outside `Hap.Api.Authorization` reach the Assessment types, and is the guard evadable?**
+- Confirmed via direct grep of `backend/src` (not just trusting the architecture test): only `AssessmentReads.cs` and `AssessmentData.cs` (both in the seam) name `Assessment`/`AssessmentScore`. No DbSet exists yet (by design, HAP-8 scope), so there is no live EF query path outside the seam to bypass at all — the strongest possible state for this AC today.
+- Examined the guard for evasion: it is a lexical/regex scan (case-sensitive `\bAssessments?\b` / `\bAssessmentScores?\b`, case-insensitive table name), keyed on FILE PATH containing the literal substring `Hap.Api/Authorization/` (not on namespace declarations). A `using Alias = Hap.Api.Authorization.Assessment;` line outside the seam WOULD still contain the literal text "Assessment" and so would still be caught (verified by tracing the regex against that exact string manually). A deliberately obfuscated reference (e.g., string-concatenation-built reflection lookup) could theoretically evade the lexical scan, but this is out of the guard's stated threat model (accidental new query paths, not a malicious insider obfuscating a bypass) and — given no DbSet is registered yet — could not reach real data even if attempted. Recorded as an observation, not a blocking defect: HAP-8, when it wires the DbSet, should confirm the guard (or an EF-model-based structural check) still holds against genuine query paths (`DbSet<Assessment>` access via `HapDbContext`), which is a stronger and less evadable check than the current lexical one.
+
+### New tests added (QA work, honestly attributed — written in the QA window, not backdated to Dev)
+
+All tagged `Category=PrivacyReporting` (inherited from class-level `[Trait]` in every file below):
+
+- `backend/tests/Hap.Api.Tests/Authorization/OrgGraphRealDirectoryTests.cs` — 7 new tests: `Attempt_group_leader_reads_a_bu_lead_outside_their_own_group_denied`, `Attempt_portfolio_leader_reads_a_group_leader_outside_their_own_portfolio_denied`, `Attempt_portfolio_leader_reads_an_ordinary_individual_four_hops_down_denied`, `Attempt_individual_reads_their_own_manager_or_a_stranger_denied`, `Attempt_manager_reads_a_skip_level_or_non_report_denied`, `Attempt_hig_executive_reads_even_their_own_direct_report_denied`, `Attempt_platform_admin_reads_any_individual_score_including_their_own_manager_denied`.
+- `backend/tests/Hap.Api.Tests/Authorization/AssessmentReadsGatewayTests.cs` — 2 new tests: `Attempt_contractor_manager_bypasses_the_restrictive_exclusion_via_an_explicit_BuDelegate_grant`, `Attempt_manager_with_an_above_BU_grant_reads_their_own_direct_report_denied`.
+- `backend/tests/Hap.Api.Tests/Authorization/ChainResolverTests.cs` — 2 new tests: `Three_node_management_cycle_terminates_and_grants_no_access_it_should_not`, `Depth_cap_terminates_a_long_acyclic_chain_without_hanging`.
+- `backend/tests/Hap.Api.Tests/Authorization/SuppressionTests.cs` — 5 new tests: `Complement_of_exactly_four_is_the_safe_boundary_and_publishes`, `Complement_of_exactly_three_is_the_unsafe_boundary_and_suppresses`, `Own_headcount_boundary_three_suppresses_four_publishes`, `Multiple_simultaneous_below_threshold_children_still_yield_a_correct_complement`, `Repeated_identical_queries_leak_nothing_beyond_the_first_answer`.
+
+No migration, no new dependency, no changes to `verify.sh` or production code — QA is test-only, as required.
+
+### Verify run (QA, 2026-07-21)
+
+`./scripts/verify.sh` **ALL GREEN** (exit 0). Backend: Domain.Tests 21, Architecture.Tests 9, Synth.Tests 41, Api.Tests **174** (up from 157 at dev clock-out; +17 QA tests — 16 authored above plus the net delta from one existing assertion's shape), all **Failed: 0**. `Category=PrivacyReporting` suite: Architecture.Tests 5 + Api.Tests **98** (up from 81), **Failed: 0**. Frontend lint/typecheck/test(74)/build green; no external font; no migration drift (idempotent re-apply no-ops as before).
+
+### Red-team verdict (QA red-team brief, CLAUDE.md §9.4)
+
+**PASS.** Concrete violation paths were constructed and attempted for every mandatory category (a)-(e); none succeeded beyond the ALREADY-DOCUMENTED, owner-flagged Q-015 one-hop residual (`PINNED_ungranted_above_BU_hierarchy_leader_CAN_read_immediate_direct_report_pending_Q014_G1`). That residual's boundary was independently probed from three directions — deeper (2+ hops), sideways (cross-group/cross-portfolio, non-direct-report), and from the strongest-favoured role (Exec, denied even for a genuine direct report) — and held exactly where the round-3 record says it does: **one hop, direct-report only, for an UNGRANTED hierarchy leader classified Manager by fallthrough.** No new defect found. No suppression differencing attack recovered a <4 figure. No grant-based bypass of the contractor Restrictive exclusion was found. The seam boundary holds for every real production code path (no DbSet exists yet, so the strongest possible state). This story is recommended for closure subject to the two STANDING PRECONDITIONS already recorded above (G1 owner ruling on the one-hop residual; HAP-8 must not wire a live endpoint until Q-014/Q-015 lands) — QA did not find grounds to add a third.
+
+**QA CLOCK-OUT (2026-07-21):** measured wall-clock 12 min (start 2026-07-21T21:01:06Z → end 2026-07-21T21:12:48Z). Far below the `qa: M` (human-equivalent ⅓-⅕ of `dev: L`) estimate — consistent with the same AI-agent-vs-human-equiv calibration gap already logged for Dev; measured, not shaved.
