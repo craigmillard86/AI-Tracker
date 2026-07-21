@@ -5,12 +5,25 @@ epic: E1-foundations
 wave: 0
 fr: [FR-001, FR-054]
 risk: L2                # trigger: EF migrations / schema
-status: qa
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-21T17:27:46Z, end: 2026-07-21T18:06:05Z, mins: 38}
   - {phase: qa, start: 2026-07-21T18:07:50Z, end: 2026-07-21T18:20:32Z, mins: 12}
-closure: null
+closure:
+  sha: 76a08ff
+  files: [backend/src/Hap.Domain/Frameworks/**, backend/src/Hap.Infrastructure/Frameworks/**, backend/src/Hap.Infrastructure/Persistence/Migrations/20260721173430_AddFrameworkEngine*, backend/src/Hap.Api/FrameworkEndpoints.cs, backend/tests/**, docs/wiki/frameworks.md, specs/001-maturity-initiative-register/data-model.md]
+  tests: "backend Domain 21 / Architecture 6 / Synth 41 / Api 52; migration #2 idempotent + chains behind #1; FR-054 structural guard (AddDimension/AddLevelDescriptor→EnsureMutable) + locked-version rejection tests; Art. II.4 no-hardcoded-content guard (case-insensitive, scans backend/src + backend/tests + app/src); verify.sh ALL GREEN"
+  risk: L2
+  panel: [hap-code-reviewer, hap-domain-specialist]
+  date: 2026-07-21
+  carry_forward:
+    - "HAP-7 (first Lock() caller): make Dimension.Create / LevelDescriptor.Create internal (or private) so 'sole guarded path' is compiler-enforced, and add a DB/SaveChanges-layer FR-054 guard. QA PROVED the public raw-factory path (Create + DbContext.Add + SaveChanges) writes content under a locked FrameworkVersion and PERSISTS through Postgres — unreachable in HAP-6 (nothing calls Lock() yet), becomes reachable the moment HAP-7 adds the first Lock() caller. Both L2 panel members + QA flagged this; it is a hard precondition of the Lock() introduction."
+    - "Content-guard coverage gap: single-word banned tokens < 10 chars are unguarded (QA proved hardcoding the dimension names 'Timing'/'Impact' passes the Art. II.4 scan). AC met (a verify-time grep test exists and runs); close with the A2 word-boundary-matching solution in a future hardening pass."
+    - "Seeder does not self-heal a manually-deleted content row (deleting one LevelDescriptor then re-seeding leaves 27, not 28 — content creation is gated behind versionIsNew). Non-blocking (no admin content-integrity tooling in scope); flag for whichever story adds it."
+    - "Q-012 (two simultaneously-Active versions per framework): Activate() does not demote the incumbent and Retire() is blocked once locked — logged, not built; resolve in the framework activation-workflow story."
+    - "Root-spec FR-054 wording ('immutability once cycle closes') vs data-model.md/api.md ('immutable once cycle-referenced'): pre-existing spec-internal drift; dev followed the more specific data-model.md wording. Needs a reconciling decision record."
+  note: "Q-011 (auto-activate a framework's first version when none is Active) logged in QUESTIONS.md, provisional in effect. NOTE: numbering collides with HAP-4's independent Q-011/Q-012 (parallel branch); reconciled at HAP-4 merge (HAP-6 keeps Q-011/Q-012, HAP-4 renumbered to Q-013/Q-014)."
 ---
 ## Story
 As a Platform Admin, the AI-DLC framework (dimensions, levels, descriptors) exists as versioned data seeded from `docs/frameworks/ai-maturity-sdlc.v1.json`, immutable once a cycle uses it, so assessment content is never hard-coded and historic scores stay tied to the version they were scored against.
