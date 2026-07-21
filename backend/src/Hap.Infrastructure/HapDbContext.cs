@@ -1,4 +1,5 @@
 using Hap.Domain.Audit;
+using Hap.Domain.Frameworks;
 using Hap.Domain.Org;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,8 +7,9 @@ namespace Hap.Infrastructure;
 
 /// <summary>
 /// The application database context. Migration #1 (HAP-3) introduces the org model, the
-/// manual-override layer, role grants, and the append-only audit log. Later stories chain
-/// forward-only migrations behind this one.
+/// manual-override layer, role grants, and the append-only audit log. Migration #2 (HAP-6)
+/// chains behind it with the framework engine (Framework/FrameworkVersion/Dimension/
+/// LevelDescriptor — FR-001/FR-054). Later stories chain forward-only migrations behind this one.
 ///
 /// Note the deliberate asymmetry on <see cref="AuditLogs"/>: the entity is immutable (no
 /// setters) and no code path calls Update/Remove on this set — enforced by
@@ -29,6 +31,10 @@ public class HapDbContext : DbContext
     public DbSet<OrgOverride> OrgOverrides => Set<OrgOverride>();
     public DbSet<RoleGrant> RoleGrants => Set<RoleGrant>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Framework> Frameworks => Set<Framework>();
+    public DbSet<FrameworkVersion> FrameworkVersions => Set<FrameworkVersion>();
+    public DbSet<Dimension> Dimensions => Set<Dimension>();
+    public DbSet<LevelDescriptor> LevelDescriptors => Set<LevelDescriptor>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -129,6 +135,61 @@ public class HapDbContext : DbContext
             e.Property(x => x.SubjectPersonId);
             e.HasIndex(x => new { x.SubjectPersonId, x.At });
             e.HasIndex(x => x.At);
+        });
+
+        modelBuilder.Entity<Framework>(e =>
+        {
+            e.ToTable("frameworks");
+            e.HasKey(x => x.Id);
+            // Framework is immutable (get-only props): every scalar property is listed
+            // explicitly so EF includes it and binds the constructor, matching OrgOverride.
+            e.Property(x => x.Key).IsRequired();
+            e.Property(x => x.Name).IsRequired();
+            e.Property(x => x.Description);
+            e.Property(x => x.Owner);
+            e.Property(x => x.CreatedAt).IsRequired();
+            e.HasIndex(x => x.Key).IsUnique();
+        });
+
+        modelBuilder.Entity<FrameworkVersion>(e =>
+        {
+            e.ToTable("framework_versions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasConversion<string>().IsRequired();
+            e.Property(x => x.SourceRef);
+            e.Property(x => x.IsLocked).IsRequired();
+            e.Property(x => x.CreatedAt).IsRequired();
+            e.HasIndex(x => new { x.FrameworkId, x.VersionNumber }).IsUnique();
+            e.HasOne<Framework>().WithMany().HasForeignKey(x => x.FrameworkId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Dimension>(e =>
+        {
+            e.ToTable("dimensions");
+            e.HasKey(x => x.Id);
+            // Dimension is immutable (get-only props): listed explicitly, as above.
+            e.Property(x => x.Key).IsRequired();
+            e.Property(x => x.Name).IsRequired();
+            e.Property(x => x.DisplayOrder).IsRequired();
+            e.Property(x => x.CreatedAt).IsRequired();
+            e.HasIndex(x => new { x.FrameworkVersionId, x.Key }).IsUnique();
+            e.HasOne<FrameworkVersion>().WithMany().HasForeignKey(x => x.FrameworkVersionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LevelDescriptor>(e =>
+        {
+            e.ToTable("level_descriptors");
+            e.HasKey(x => x.Id);
+            // LevelDescriptor is immutable (get-only props): listed explicitly, as above.
+            e.Property(x => x.Level).IsRequired();
+            e.Property(x => x.LevelName).IsRequired();
+            e.Property(x => x.DescriptorText).IsRequired();
+            e.Property(x => x.CreatedAt).IsRequired();
+            e.HasIndex(x => new { x.DimensionId, x.Level }).IsUnique();
+            e.HasOne<Dimension>().WithMany().HasForeignKey(x => x.DimensionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

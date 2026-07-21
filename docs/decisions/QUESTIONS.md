@@ -86,3 +86,19 @@ The override layer (FR-023) models three fields: `BusinessUnit`, `Manager`, `Dot
 **Blocks:** nothing — HAP-3 records/audits DottedLine overrides; giving them an effect later is an additive L3 change.
 **Owner action:** confirm whether dotted lines carry any visibility/reporting semantics before that feature is built.
 **Status:** OPEN (provisional answer in effect)
+
+## 2026-07-21 · spec 001 / HAP-6 · Q-011 — Does the seeded v1 framework version start Active or Draft?
+
+`docs/frameworks/ai-maturity-sdlc.v1.json` carries `"status": "draft"`, and `data-model.md`'s `FrameworkVersion.status` enum is `Draft | Active | Retired`. Taken literally, seeding v1 would leave it Draft — but HAP-6's acceptance criterion requires `GET /api/frameworks/current` to return "the active version" so the assessment UI can be driven from data, and there is no other admin flow in scope yet to promote a version.
+
+**Provisional answer in effect (per CLAUDE.md §6.3):** the seeder auto-activates a framework's very first version when the framework currently has no Active version (general bootstrap rule, not JSON-specific — a JSON `"status"` of `draft` is informational/authoring metadata, not literally imported as the initial `FrameworkVersion.Status`). Seeding a second version (v2) does **not** auto-activate — that requires an explicit admin activation step (not built in HAP-6; `FrameworkVersion.Activate()` exists as a domain method, unexercised by any endpoint yet). Re-seeding v1 is idempotent and does not re-trigger auto-activation once any version of the framework is Active.
+
+**Blocks:** nothing — local synthetic build; a reversal (e.g. require explicit admin activation even for the first version, leaving `/current` briefly empty after seed) is a seeder behaviour change + test update, not a schema change.
+**Status:** OPEN (provisional answer in effect)
+
+## 2026-07-21 · spec 001 / HAP-6 · L2 panel round 1 · Q-012 — Nothing enforces "exactly one Active FrameworkVersion per framework"
+
+`FrameworkVersion.Activate()` (FR-054) promotes the target version to Active but does not demote whichever version was previously Active for the same framework — nothing in the domain or the seeder enforces "at most one Active version per framework" as an invariant. Today this is harmless: HAP-6 only ever activates a framework's first version (bootstrap, Q-011) and never wires an admin activation endpoint, so two Active versions cannot occur in practice yet. But the gap is real and will matter the moment an activation workflow ships (HAP-7 or later) — e.g. two independent `Activate()` calls (v1, then v2) would leave both Active, and `GET /api/frameworks/current`'s `OrderByDescending(VersionNumber).FirstOrDefault()` would silently paper over it by picking the higher version number rather than surfacing the inconsistency.
+
+**Blocks:** nothing in HAP-6 — no code path can trigger the two-Active state today. Whichever story adds an admin activation flow must decide the invariant explicitly: `Activate()` auto-demotes the incumbent (a version-level side effect), or the caller is required to `Retire()`/deactivate the old one first (an explicit two-step), or a DB constraint (partial unique index on `(framework_id) WHERE status = 'Active'`) enforces it as a hard invariant regardless of caller discipline.
+**Status:** OPEN

@@ -1,5 +1,6 @@
 using Hap.Api;
 using Hap.Infrastructure;
+using Hap.Infrastructure.Frameworks;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,7 +21,14 @@ var snapshotPath =
     ?? Environment.GetEnvironmentVariable("HAP_DIRECTORY_SNAPSHOT")
     ?? Path.Combine(AppContext.BaseDirectory, "directory.json");
 
-builder.Services.AddHapInfrastructure(snapshotPath);
+// Path to the seeded framework definition JSON (docs/frameworks/ai-maturity-sdlc.v1.json).
+// Same override-then-fallback shape as the directory snapshot above (HAP-6, FR-001).
+var frameworkDefinitionPath =
+    builder.Configuration["Hap:FrameworkDefinitionPath"]
+    ?? Environment.GetEnvironmentVariable("HAP_FRAMEWORK_DEFINITION")
+    ?? FrameworkDefinitionLocator.ResolveDefaultPath();
+
+builder.Services.AddHapInfrastructure(snapshotPath, frameworkDefinitionPath);
 
 var app = builder.Build();
 
@@ -29,6 +37,7 @@ var app = builder.Build();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
 app.MapAdminEndpoints();
+app.MapFrameworkEndpoints();
 
 app.Run();
 

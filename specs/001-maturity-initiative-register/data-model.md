@@ -42,7 +42,11 @@ Entities mapped from spec Key Entities + FRs. PostgreSQL via EF Core, forward-on
 - id, framework_version_id, key, name, display_order
 
 ### LevelDescriptor
-- id, dimension_id, level (0–3), descriptor_text
+- id, dimension_id, level (0–3), level_name, descriptor_text
+- `level_name` (HAP-6, panel round-1 advisory) is the framework-wide label for `level` (e.g. the
+  top autonomy level's name), denormalised onto every descriptor row rather than modelled as a
+  separate table — the value only ever repeats across the (typically 7) dimensions of one
+  version, and the source JSON's `levels` array has no other home in this schema.
 
 ## Cycles & assessment
 

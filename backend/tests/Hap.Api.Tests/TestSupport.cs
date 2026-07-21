@@ -72,7 +72,8 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
         var db = scope.ServiceProvider.GetRequiredService<HapDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             "SET session_replication_role = 'replica'; " +
-            "TRUNCATE audit_log, org_overrides, role_grants, people, business_units, groups, portfolios RESTART IDENTITY CASCADE; " +
+            "TRUNCATE audit_log, org_overrides, role_grants, people, business_units, groups, portfolios, " +
+            "level_descriptors, dimensions, framework_versions, frameworks RESTART IDENTITY CASCADE; " +
             "SET session_replication_role = 'origin';");
     }
 
