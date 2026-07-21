@@ -9,7 +9,7 @@
 
 ## 1. What this project is
 
-An internal web application measuring and driving AI adoption across HIG's ~23 business units: monthly AI-DLC maturity assessments (self + manager review, rolled up person → team → BU → group → portfolio), a register of AI initiatives, and pre-filled Harris AI Dashboard submissions generated from live data. Root spec: `docs/spec/hig-ai-maturity-platform-specification.md`. Every commit cites an FR-ID from it.
+An internal web application measuring and driving AI adoption across HIG's ~23 business units: monthly AI-DLC maturity assessments (self + manager review, rolled up person → team → BU → group → portfolio), a register of AI initiatives, and pre-filled Harris AI Dashboard submissions generated from live data. Root spec: `docs/spec/hig-ai-maturity-platform-specification.md`; Spec Kit feature specs derived from it live under `specs/` (DR-0002; current: `specs/001-maturity-initiative-register/spec.md`). Every commit cites an FR-ID (`FR-NNN`) from the governing feature spec.
 
 **Two things are sacred** (constitution Art. VI): individual assessment data is UK-GDPR personal data — no read path may bypass the authorisation layer; and Harris submission figures must reconcile to underlying records. Code touching either is L3 (§6) no matter how small the diff.
 
@@ -23,6 +23,7 @@ An internal web application measuring and driving AI adoption across HIG's ~23 b
 HAP/
 ├── CLAUDE.md                  ← this contract
 ├── .specify/memory/constitution.md
+├── specs/                     ← Spec Kit feature specs (/specify → /plan → /tasks; DR-0002)
 ├── docker-compose.yml         ← local runtime: api, app, postgres, mailpit
 ├── backend/                   ← .NET 8 (Hap.Api, Hap.Domain, Hap.Infrastructure, tests)
 │   └── src/Hap.Api/Authorization/   ← THE VISIBILITY SEAM — L3, always
@@ -31,7 +32,7 @@ HAP/
 │   ├── verify.sh              ← the gate of record (§7)
 │   └── synth/                 ← deterministic synthetic data generators (seeded)
 └── docs/
-    ├── spec/                  ← root specification + /specify feature specs
+    ├── spec/                  ← root specification (verbatim; feature specs live in specs/)
     ├── backlog/               ← THE BACKLOG: one file per story + generated board.md
     ├── decisions/             ← append-only decision records + QUESTIONS.md
     ├── delivery/              ← wave plan
@@ -49,7 +50,7 @@ id: HAP-14
 title: Manager moderation flow
 epic: E3-assessment
 wave: 2
-fr: [FR-3.3]
+fr: [FR-008]            # FR-NNN from the governing feature spec (DR-0002)
 risk: L2                # set at Phase 1 from the §6 table
 status: todo            # todo | in-progress | qa | done | blocked
 estimate: {dev: M, qa: S}     # T-shirt, set once, never revised
@@ -86,7 +87,7 @@ Never work on `main`. Never reuse a branch across stories.
 
 ## 6. Phase 1 — Setup
 
-1. Read the story file, its epic, and the cited FR in the spec; read any linked feature spec/plan under `docs/spec/`.
+1. Read the story file, its epic, and the cited FR in the governing feature spec under `specs/`; read the root spec section it traces to (`docs/spec/`) and any linked plan.
 2. **Check for prior attempts** — `git log --all --oneline --grep "HAP-<n>"` plus the story file's Attempts section. Never silently redo; if a prior attempt exists, read its notes and state what you're doing differently.
 3. Ambiguous requirement? **Stop.** Append the question to `docs/decisions/QUESTIONS.md` (dated, story-keyed). If a provisional answer is essential, record the assumption in the story file's notes and flag it — answers that change behaviour become decision records.
 4. Create worktree + branch. Classify risk from §7 — first match wins, uncertainty rounds up. Write `risk:` into the frontmatter and state the trigger in the notes.

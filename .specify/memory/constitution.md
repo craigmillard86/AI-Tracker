@@ -8,7 +8,7 @@ operating model (surfaces of truth · five-phase lifecycle · risk-scaled review
 adapted for a FULLY LOCAL build: no Jira, no Azure, no external services required to deliver.
 -->
 
-**Version:** 1.1.1 · **Ratified:** 2026-07-20 · **Last amended:** 2026-07-21 (DR-0001) · **Owner:** Craig Millard (Vanguard)
+**Version:** 1.1.2 · **Ratified:** 2026-07-20 · **Last amended:** 2026-07-21 (DR-0001, DR-0002) · **Owner:** Craig Millard (Vanguard)
 **Story key:** `HAP` (local identifier scheme; survives unchanged if a tracker is adopted later)
 
 ## Preamble
@@ -27,7 +27,7 @@ Nothing is duplicated as a source. Each surface is authoritative for exactly one
 
 | Surface | Authoritative for | Notes |
 |---|---|---|
-| **Spec bundle** (`docs/` + `.specify/`) | WHAT to build & WHY | The application specification, feature specs from `/specify`, plans from `/plan`, framework definitions (AI-DLC dimensions/levels as data), decision records, `QUESTIONS.md` |
+| **Spec bundle** (`docs/` + `specs/` + `.specify/`) | WHAT to build & WHY | The root application specification (`docs/spec/`), feature specs from `/specify` (under `specs/`, per DR-0002), plans from `/plan`, framework definitions (AI-DLC dimensions/levels as data), decision records, `QUESTIONS.md` |
 | **Backlog-as-files** (`docs/backlog/`) | WHAT'S NEXT & WHAT SHIPPED | One markdown file per story (`HAP-N-slug.md`) with YAML frontmatter: status, wave, epic, FR-IDs, risk class, estimates, measured worklogs, closure record (merge SHA, panel, tests). `board.md` is a generated index, never hand-authored truth |
 | **Git repository** (local) | WHAT THE CODE IS | .NET 8 API, React/TypeScript client, docker-compose, the spec bundle itself, and the append-only `ai-change-log.csv`. Every merge to `main` is a squash merge that passed its risk-class review. A remote (GitHub) may be added later; local `main` is the line of record until then |
 | **`CLAUDE.md`** (repo root) | HOW WORK HAPPENS | The binding agent contract implementing this constitution: drift sweep, phase workflow, risk triggers, time-tracking mechanics, hard don'ts. Loaded by every agent session |
@@ -36,7 +36,7 @@ Nothing is duplicated as a source. Each surface is authoritative for exactly one
 
 ## Article II — Spec Before Code, Always
 
-1. No story is implemented without a governing spec: the signed-off application specification is the root; `/specify` produces feature specs from it; `/plan` produces technical plans; `/tasks` produces the backlog story files. Code that cannot cite an FR-ID does not merge.
+1. No story is implemented without a governing spec: the signed-off application specification is the root (`docs/spec/`); `/specify` produces feature specs from it (under `specs/`); `/plan` produces technical plans; `/tasks` produces the backlog story files. Code that cannot cite an FR-ID does not merge; FR-IDs are cited from the governing feature spec (FR-NNN scheme, per DR-0002), which traces to the root specification.
 2. Specs define **WHAT and WHY, never HOW**. Plans own HOW and must pass the constitution check gates in the Spec Kit templates before tasks are generated.
 3. Ambiguity routes to the owner, not to guesses: agents log unclear requirements in `docs/decisions/QUESTIONS.md`. Answers that change behaviour become **append-only decision records** — to change a decision, a new record supersedes it; history is never rewritten.
 4. The AI-DLC framework, Harris taxonomy, and submission templates are **data, not code** (per spec §3.1, §6.1). Hard-coding a dimension, level descriptor, or Harris form structure is a constitution violation.
