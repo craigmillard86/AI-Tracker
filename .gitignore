@@ -1,0 +1,22 @@
+# Session / local state (never committed — CLAUDE.md §12)
+.omc/
+.claude/cost-log.csv
+.claude/settings.local.json
+.wallclock-*
+
+# Build outputs (backend)
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Build outputs (frontend)
+node_modules/
+dist/
+coverage/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
