@@ -5,12 +5,12 @@ epic: E1-foundations
 wave: 0
 fr: [FR-020]
 risk: L2                # trigger: feeds directory-import; uncertainty rounds up (constitution: synth distributions are protected)
-status: qa
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-21T15:06:02Z, end: 2026-07-21T15:34:59Z, mins: 28}
   - {phase: qa, start: 2026-07-21T15:36:32Z, end: 2026-07-21T15:42:50Z, mins: 6}
-closure: null
+closure: {sha: 2ef0cdf, files: [backend/src/Hap.Synth/**, backend/tests/Hap.Synth.Tests/**, scripts/synth/generate.sh, backend/Hap.sln, .gitignore, docs/decisions/QUESTIONS.md], tests: "Hap.Synth.Tests 41/41 (26 dev + 15 QA negative-path); verify.sh ALL GREEN", risk: L2, panel: [hap-code-reviewer, hap-domain-specialist], date: 2026-07-21}
 ---
 ## Story
 As the platform team, we need a deterministic, seeded synthetic directory covering 23 BUs with every edge case engineered in, so all later stories build and test against realistic org data without any real employee data ever existing in this repo.
