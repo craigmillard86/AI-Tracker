@@ -27,6 +27,28 @@ Status codes: 423 locked · 409 already-submitted / no-cycle-on-write · 422 inc
 
 One dimension per section, four LevelSelectorCards (native radio group + arrow-key nav; selected = 2px teal border + check icon, never colour-alone), per-dimension evidence, PurposeBanner above the first section, ProgressStepper "x of 7" + projected floor (the 5-of-7 → floor L0 state is the binding mockup case). A pre-populated prior value shows a "last month" pill but doesn't count toward progress until re-confirmed. When the cycle is closed without an override the form renders **read-only** (A4 disabled treatment on cards/evidence/buttons + a notice). SC-007 WCAG 2.2 AA (keyboard-only completion, vitest-axe); strings externalised; tokens.css only.
 
+## Manager moderation (HAP-9 — FR-008/009/010/011/012/063/069)
+
+The manager's review turns a `Submitted` self-assessment into the **moderated score of record**. All cross-person reads live in the seam (`Hap.Api/Authorization`): `ManagerModerationService` over `TeamEndpoints` (`GET /api/team/reviews`, `GET /api/team/members/{id}/assessment` **[audited]**, `PUT /api/team/reviews/{id}`), with the individual's own result at `GET /api/me/assessment/result`.
+
+### Who may moderate — `moderation ⊆ read`
+
+Authorisation is a **conjunction**: `AuthorizeModeration = AuthorizeIndividualRead.Allowed AND ReviewerOfRecord(subject) == caller`. A caller who cannot *see* a subject's scores can never *moderate* them — this closed a real leak where an above-BU leader (e.g. HIG Executive, denied individual reads by FR-025 cl.2) was the chain manager of a Portfolio Leader and could extract self-scores through the moderation error path. The **reviewer of record** is `ChainResolver.ReviewerOfRecord` — the first *active, non-contractor* ancestor, so DR-0006 contractor managers and FR-070 departed managers are skipped to the real reviewer, while a valid direct manager short-circuits the walk (no skip-level over-grant; DR-0005 one-hop preserved). Every endpoint builds the caller's **real grants** via `CallerContextAsync` (a fresh `RoleGrant` DB read per HAP-4 A3 — never a stripped/`Ungranted` context, which was the root cause of the read leak). A capability-less caller gets an **empty queue** and **404** on read/moderate, with **zero audit rows** on denial.
+
+> **Q-020 (open, owner ruling):** a senior leader whose reviewer-of-record is aggregates-only (a Portfolio Leader under the HIG Executive) has **no eligible moderator** — correct per `moderation ⊆ read`, but it means such assessments go unmoderated and **auto-adopt at close** (FR-068/HAP-10). Provisional (fail-closed): auto-adopt. Two addenda in QUESTIONS.md record why this *extends* rather than contradicts DR-0005, and a cousin BU-delegate cross-BU edge.
+
+### Moderation write — divergence, carry-forward, audit, lock
+
+- **Score of record:** both `SelfScore` and `ManagerScore` persist per dimension (FR-010/011); divergence is **computed live**, never stored. `SetManager` is the sole mutator and **unconditionally** enforces FR-009: `|self − manager| ≥ threshold` requires a comment or the write is rejected **422** (no carry-forward exemption). The server-driven `commentThreshold` / `defaultCommentRequired` flags mean the client never holds a threshold literal, and a carried-forward Δ≥2 default is flagged comment-required so GET and PUT agree.
+- **Carry-forward (FR-063):** default adopts the self-score; where a prior-cycle moderated score exists and the self-score is unchanged, the default is carry-forward (the prior *score*, not its comment — Q-019).
+- **Audit:** each successful individual view writes **exactly one** `IndividualView` row and each moderation write **one** `ScoreChange` row (Q-018 keep — FR-050 names score changes as MUST-audit), both staged+committed **before** data returns; an audit-write failure **fails the request** (fail-closed).
+- **Submission lock (Q-017a):** a moderation write is a submission-class write — it consults `Cycle.AllowsSubmission` + the subject-keyed late override, so post-close moderation is **423** unless an override exists. The queue's `CanModerate` honours the same override, so queue and write agree.
+- **Concurrency:** `Assessment` carries an **xmin** optimistic-concurrency token; racing moderations resolve to a clean **409** with the whole unit of work (scores + state + audit) rolled back — exactly one `ScoreChange` row survives, never a 500.
+
+### UI (`app/src/screens/assessment-moderation`, components `DivergenceFlag`/`ComparisonRow`)
+
+Review queue → per-dimension `ComparisonRow` printing **both** self and manager values, `DivergenceFlag` at Δ≥1, the forced-comment error state at Δ≥2 (amber row + red-bordered required field, colour never the sole signal), carry-forward defaults pre-filled, a calibration-delta line, and read-only-on-submit (A4 disabled treatment, mirroring HAP-8's close state). After moderation the individual's result view (FR-012) shows manager scores, comments, and divergence; 404 before. WCAG 2.2 AA (vitest-axe), strings externalised, `tokens.css` only.
+
 ## Cycle state machine (HAP-7 — FR-002/003/004/005/006/060)
 
 One global monthly assessment cycle per framework. `Cycle` is a **forward-only** state machine: `Draft → Open → Closed`. `Open()` and `Close()` reject any other transition; there is no path back. At most one `Open` cycle exists per framework at a time (a second `open` returns 409).

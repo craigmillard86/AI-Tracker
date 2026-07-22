@@ -5,12 +5,19 @@ epic: E2-assessment
 wave: 1
 fr: [FR-008, FR-009, FR-010, FR-011, FR-012, FR-063, FR-069]
 risk: L3                # trigger: read path over Assessments/AssessmentScores + individual-view audit writes
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-22T07:26:29Z, end: 2026-07-22T10:13:28Z, mins: 166}
   - {phase: qa, start: 2026-07-22T10:15:34Z, end: 2026-07-22T10:52:05Z, mins: 36}
-closure: null
+closure:
+  sha: c511f0e
+  date: 2026-07-22
+  risk: L3
+  files: 38  # seam/Authorization (ManagerModerationService, AssessmentReads, SeamAssessmentStore, SeamCycleResolver, CallerContextAsync), TeamEndpoints, domain Assessment/AssessmentScore, app moderation screen + DivergenceFlag/ComparisonRow, tests
+  tests: backend 401/401 (Category=PrivacyReporting 180/180); frontend 12 files green; lint+typecheck+build clean
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team, hap-design-reviewer]  # L3; 3 rounds, clean at 4dc05df
+  qa: hap-qa PASS — 15 adversarial tests, all 7 roles denied outside-chain on all 3 surfaces, EXEC-leak proven closed at HTTP
 ---
 ## Story
 As a Manager, I review each direct report's self-scores and evidence side by side, adopt or diverge (comment forced at Δ≥2, carry-forward default), producing the moderated score of record — and my report sees exactly what I decided and why.
