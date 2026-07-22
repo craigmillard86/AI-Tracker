@@ -161,12 +161,27 @@ def main() -> None:
 
     log_path = os.path.join(cwd, ".claude", "cost-log.csv")
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    new_file = not os.path.exists(log_path)
-    with open(log_path, "a", newline="", encoding="utf-8") as fh:
+    header = ["timestamp", "session_id", "branch", "story",
+              "input_tokens", "output_tokens", "cost_usd"]
+
+    # Rewrite the whole file: keep every OTHER session's rows verbatim and
+    # REPLACE this session's. This makes the write idempotent across SessionEnd
+    # re-fires and self-heals any prior malformed rows for this session (e.g. the
+    # duplicate rows written under DR-0007's superseded mechanism), without ever
+    # touching another session's history. (col 1 = session_id.)
+    kept = []
+    if os.path.exists(log_path):
+        with open(log_path, newline="", encoding="utf-8") as fh:
+            for i, row in enumerate(csv.reader(fh)):
+                if i == 0 or not row:
+                    continue  # drop old header; re-add canonical below
+                if len(row) >= 2 and row[1] != session_id:
+                    kept.append(row)
+    with open(log_path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        if new_file:
-            w.writerow(["timestamp", "session_id", "branch", "story",
-                        "input_tokens", "output_tokens", "cost_usd"])
+        w.writerow(header)
+        for row in kept:
+            w.writerow(row)
         for branch, story, tin, tout, cost in rows:
             w.writerow([ts, session_id, branch, story, tin, tout, f"{cost:.4f}"])
 
