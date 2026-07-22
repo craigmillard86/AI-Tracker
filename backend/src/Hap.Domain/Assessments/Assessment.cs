@@ -72,14 +72,38 @@ public sealed class Assessment
     /// cannot be moderated again). The seam maps the throw to a 409.</summary>
     public void Moderate(Guid moderatedByPersonId)
     {
-        if (State != AssessmentState.Submitted)
+        // Submitted → Moderated is the normal path. AutoAdopted → Moderated is the late-override path
+        // (Q-017a × FR-068): a late override granted AFTER close reopens the moderation window, and by then
+        // the close has already auto-adopted the self-score as a placeholder — so a real moderation must be
+        // able to replace it, clearing the unmoderated flag. Any other state (NotStarted/InProgress =
+        // nothing to moderate; Moderated = already resolved) still throws → 409.
+        if (State is not (AssessmentState.Submitted or AssessmentState.AutoAdopted))
         {
             throw new AssessmentStateException(Id, State, AssessmentState.Moderated);
         }
 
         State = AssessmentState.Moderated;
+        Unmoderated = false; // a genuine review supersedes any auto-adoption placeholder
         ModeratedAt = DateTime.UtcNow;
         ModeratedByPersonId = moderatedByPersonId;
+    }
+
+    /// <summary>Submitted → AutoAdopted at cycle close when no manager review completed (FR-068): the
+    /// self-score becomes the moderated score of record and the assessment is flagged
+    /// <see cref="Unmoderated"/>. No moderator is recorded — there was none (an escalated reviewer of
+    /// record could have moderated before close, FR-070, but did not). Forward-only: throws if the
+    /// assessment is not currently Submitted (an InProgress/NotStarted one never entered the review
+    /// queue; a Moderated/AutoAdopted one is already resolved and must never be re-adopted — that would
+    /// silently flip a real moderation to unmoderated).</summary>
+    public void AutoAdopt()
+    {
+        if (State != AssessmentState.Submitted)
+        {
+            throw new AssessmentStateException(Id, State, AssessmentState.AutoAdopted);
+        }
+
+        State = AssessmentState.AutoAdopted;
+        Unmoderated = true;
     }
 }
 

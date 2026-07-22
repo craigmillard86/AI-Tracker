@@ -102,10 +102,13 @@ public sealed class SeamAssessmentStore : IAssessmentStore, ISelfAssessmentStore
             .SingleOrDefaultAsync(a => a.Id == assessmentId, cancellationToken)
             ?? throw new AssessmentNotFoundException(assessmentId);
 
-        // State is checked BEFORE any score write so a wrong-state moderation (re-moderating an already-
-        // Moderated assessment, or moderating one still InProgress) fails 409 without partially applying
-        // manager scores. Assessment.Moderate() re-asserts the same invariant as a backstop.
-        if (assessment.State != AssessmentState.Submitted)
+        // State is checked BEFORE any score write so a wrong-state moderation fails 409 without partially
+        // applying manager scores. Submitted is the normal path; AutoAdopted is the late-override path
+        // (Q-017a × FR-068) — a post-close override reopens moderation, and by then close has auto-adopted a
+        // placeholder that a real review replaces (the submission lock upstream has already required the
+        // override for a closed cycle). Moderated (already resolved) / InProgress / NotStarted still fail.
+        // Assessment.Moderate() re-asserts the same invariant as a backstop.
+        if (assessment.State is not (AssessmentState.Submitted or AssessmentState.AutoAdopted))
         {
             throw new AssessmentStateException(assessment.Id, assessment.State, AssessmentState.Moderated);
         }

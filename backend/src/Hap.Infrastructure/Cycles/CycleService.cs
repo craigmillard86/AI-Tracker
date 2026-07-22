@@ -44,8 +44,13 @@ public sealed class FrameworkVersionNotFoundException : Exception
 public sealed class CycleService
 {
     private readonly HapDbContext _db;
+    private readonly ICycleCloseProcessor _closeProcessor;
 
-    public CycleService(HapDbContext db) => _db = db;
+    public CycleService(HapDbContext db, ICycleCloseProcessor closeProcessor)
+    {
+        _db = db;
+        _closeProcessor = closeProcessor;
+    }
 
     /// <summary>Creates a Draft cycle against an existing, non-retired framework version. No
     /// uniqueness check happens here — "one Open per framework" is enforced at <see cref="OpenAsync"/>,
@@ -135,20 +140,31 @@ public sealed class CycleService
         return new CycleOpenResult(cycle, people.Count, invited, excludedContractor, excludedNotOnboarded);
     }
 
-    /// <summary>Open → Closed only (forward-only; throws <see cref="CycleStateTransitionException"/>
-    /// otherwise — 409). No auto-adoption, rollups, or notifications here: those are HAP-10/HAP-18.
-    /// contracts/api.md documents close as running auto-adoption (FR-068) + snapshots + suppression
-    /// (research D2/D4) — HAP-10 MUST hook that work into THIS method (or a wrapper that still
-    /// calls through it for the state transition) rather than building a parallel close path, so
-    /// the Open→Closed transition and its side effects stay atomic and this handoff isn't silently
-    /// dropped the way the late-override consult obligation almost was (QUESTIONS.md Q-017a/addendum).</summary>
+    /// <summary>Open → Closed (forward-only; throws <see cref="CycleStateTransitionException"/>
+    /// otherwise — 409), running the close-time side effects atomically with the transition (Q-017).
+    /// In ONE transaction: the state transition, then <see cref="ICycleCloseProcessor.RunAsync"/> —
+    /// auto-adoption of unmoderated submissions (FR-068), per-node rollup snapshots (research D4), and
+    /// frozen suppression verdicts (research D2). The processor lives in the visibility seam because the
+    /// score reads it performs may only happen there (research D1); it stages its writes on this same
+    /// context, so the whole close either commits together or rolls back together — history is never left
+    /// half-computed, and the handoff can't be silently dropped the way the late-override consult almost
+    /// was (Q-017a/addendum).</summary>
     public async Task<Cycle> CloseAsync(Guid cycleId, CancellationToken ct = default)
     {
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
         var cycle = await _db.Cycles.FindAsync(new object[] { cycleId }, ct)
             ?? throw new CycleNotFoundException(cycleId);
 
-        cycle.Close();
+        cycle.Close(); // Open → Closed (throws → 409) BEFORE any snapshot work — a bad-state close does nothing.
+
+        // Auto-adoption + rollup snapshots + frozen suppression, staged on THIS context inside THIS
+        // transaction (the processor does not open its own tx or commit). Runs after the transition so a
+        // wrong-state close (already-Closed / Draft) fails fast without touching assessment rows.
+        await _closeProcessor.RunAsync(cycleId, ct);
+
         await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return cycle;
     }
 

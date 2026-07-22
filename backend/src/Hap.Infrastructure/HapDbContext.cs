@@ -44,6 +44,7 @@ public class HapDbContext : DbContext
     public DbSet<Cycle> Cycles => Set<Cycle>();
     public DbSet<CycleInvitation> CycleInvitations => Set<CycleInvitation>();
     public DbSet<CycleLateOverride> CycleLateOverrides => Set<CycleLateOverride>();
+    public DbSet<Domain.Rollups.RollupSnapshot> RollupSnapshots => Set<Domain.Rollups.RollupSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -256,5 +257,10 @@ public class HapDbContext : DbContext
         // the seam's store is the only query path (research D1).
         modelBuilder.ApplyConfiguration(new Persistence.AssessmentConfiguration());
         modelBuilder.ApplyConfiguration(new Persistence.AssessmentScoreConfiguration());
+
+        // The rollup snapshot table (HAP-10, migration #5) — frozen aggregate output written at cycle
+        // close (research D4). Aggregate output, not individual data, so unlike the assessment tables it
+        // carries a public DbSet; append-only is enforced at the DB by the migration's triggers.
+        modelBuilder.ApplyConfiguration(new Persistence.RollupSnapshotConfiguration());
     }
 }

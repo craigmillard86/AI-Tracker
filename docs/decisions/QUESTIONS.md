@@ -531,3 +531,42 @@ IX.1 ("`docker compose up -d --build` is the whole stack").
 
 **Owner decision needed:** file this as a new backlog story, or treat it as **HAP-1 (scaffold-and-gate) drift** to be
 repaired under that story's remit? **Status:** OPEN.
+
+## Q-022 — auto-adoption (FR-068) vs a post-close late override (Q-017a): may an auto-adopted assessment be re-moderated?
+
+**Raised:** 2026-07-22 (HAP-10 dev) · **Type:** behaviour reconciliation between two shipped features · **Status:** PROVISIONAL (fail-safe; flag for panel/owner)
+
+Cycle close auto-adopts every Submitted-but-unmoderated assessment (FR-068). Separately, a late override reopens the
+submission/moderation window for an individual **after** close (Q-017a; HAP-9). The two collide when an override is granted
+**post-close** (which the HAP-9 acceptance tests do — `Post_close_moderation_is_locked_423_unless_a_late_override_exists`
+and `Queue_CanModerate_honours_a_post_close_late_override…`): by then close has already auto-adopted the report, so its
+state is `AutoAdopted`, and the pre-HAP-10 moderation guard (`state == Submitted`) would now reject the very moderation the
+override is meant to enable (409). Excluding override-holders from auto-adopt at close does NOT solve it — at close there is
+no override yet.
+
+**Provisional resolution (implemented):** a late override lets a manager **re-moderate an `AutoAdopted` assessment**
+(`AutoAdopted → Moderated`), replacing the auto-adopted self-score placeholder with a genuine manager review and clearing
+the `unmoderated` flag. Moderation now accepts `Submitted` **or** `AutoAdopted` (domain `Assessment.Moderate`, seam
+`ModerateAsync`, queue `CanModerate`, member-read `editable`), still gated by the same submission lock (post-close requires
+the override) and unchanged for `Moderated`/`InProgress`/`NotStarted` (still 409). This preserves both features and keeps
+the HAP-9 tests green. Rationale: auto-adoption is a *provisional* placeholder for "review never happened"; an override is
+an explicit instruction to let the review happen after all, so it should supersede the placeholder.
+
+**Why it needs a ruling:** it slightly widens the `Moderate` contract (an L2/L3 moderation-path change) and means a
+rollup snapshot taken at close can later be contradicted by a subsequent moderation of an override-holder — but only for a
+person explicitly re-opened by an admin/manager, and the snapshot itself remains immutable (a re-close/regeneration
+question, not a mutation). If the owner prefers auto-adoption to be terminal (override reopens *submission* only, never
+*moderation*), revert to `Submitted`-only and instead exempt override-holders at close — but that requires overrides to be
+granted before close, contradicting the current HAP-9 tests.
+
+## Q-023 — cross-BU / manager-less people in Team rollups: teamless / BU-direct
+
+**Raised & ruled:** 2026-07-22 (HAP-10 dev + panel round-1 domain specialist) · **Type:** aggregation-model ruling · **Status:** PROVISIONAL-IN-EFFECT, L3-panel-decidable, NO owner needed (same class as Q-008/Q-016)
+
+At cycle close the Team rollup node is keyed by manager id, but BU/Group/Portfolio nodes are keyed by home-BU containment. Two synth/admin edges make a person's home BU differ from their manager's: **HAP-EDGE-XBU-REPORT** (home BU02, managed by a BU01 lead) and an admin `OverrideField.Manager` re-point. Keying a Team by manager id alone then places a member in a team rooted in a BU they do not belong to → Σ(team n) can exceed a BU's n → `SuppressionEvaluator` throws (500 close) or freezes a wrong (under-)suppression verdict.
+
+**Ruling (domain, implemented):** a Team node exists only where the report **and** their manager share a **home BU**. Anyone without a same-BU manager — manager-less (BU heads) OR cross-BU-managed — is **TEAMLESS**: counted only at BU/Group/Portfolio/AllHig via their **home BU**, in no Team node. Rejected alternatives: per-BU team fragments (no support — CLAUDE.md §8.3, hierarchy mappings are data not code, so we don't fabricate synthetic team nodes); routing scores through the manager's BU (home-BU attribution is root spec §3.5/Q-016 and stays unchanged). Their manager still REVIEWS them via the existing DR-0006/FR-070 reviewer-of-record path — this changes only the aggregate Team-rollup node. Consequence: every Team nests within exactly one BU → Σ(team n) ≤ BU n always → no throw, correct frozen suppression, and the reconciliation invariant is the team-homed carve-out (see the HAP-10 snapshot-totals AC, spec-corrected). Locked by `A_cross_bu_managed_report_is_teamless…` and `A_manager_less_scored_bu_head_is_teamless…`.
+
+## Q-022 addendum — reconciliation is "as of close" (frozen snapshot legitimately diverges from post-close raw edits)
+
+**Added:** 2026-07-22 (HAP-10 panel round-1 F3). Because a post-close late override may re-moderate an already-auto-adopted assessment (the Q-022 ruling), the raw `AssessmentScore` rows for that cycle can change AFTER the `RollupSnapshot` was frozen at close. This is **intended immutable history, not a desync**: the snapshot is the authoritative "as of close" figure, and any future reconciliation check MUST compare a freshly-recomputed close-state (or read the snapshot itself), never live post-override rows against the frozen snapshot. Enforced by the append-only snapshot (byte-for-byte freeze test `A_post_close_override_re_moderation_never_alters_the_frozen_snapshot`). If the owner later wants post-override edits reflected in trend history, that is a NEW re-close/regeneration story (a new immutable snapshot), never an in-place mutation.

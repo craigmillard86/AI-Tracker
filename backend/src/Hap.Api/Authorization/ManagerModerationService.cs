@@ -145,7 +145,9 @@ public sealed class ManagerModerationService
                     OnLeave: person?.OnLeave ?? false,
                     State: state.ToString(),
                     // Mirrors the write path's submission lock (the PUT re-checks it authoritatively).
-                    CanModerate: state == AssessmentState.Submitted
+                    // Submitted OR AutoAdopted is moderatable: a post-close late override reopens an
+                    // auto-adopted report for a real review (Q-017a × FR-068), gated by the same lock.
+                    CanModerate: state is (AssessmentState.Submitted or AssessmentState.AutoAdopted)
                                  && cycle.AllowsSubmission(overriddenPersonIds.Contains(personId)));
             })
             .OrderBy(i => i.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -243,7 +245,10 @@ public sealed class ManagerModerationService
             .ToList();
 
         var hasLateOverride = await _cycles.HasLateOverrideAsync(cycle.Id, subjectPersonId, ct);
-        var editable = current.Assessment.State == AssessmentState.Submitted && cycle.AllowsSubmission(hasLateOverride);
+        // Editable when moderatable: Submitted normally, or AutoAdopted under a post-close late override
+        // (Q-017a × FR-068) — the same states the write path accepts, gated by the same submission lock.
+        var editable = current.Assessment.State is (AssessmentState.Submitted or AssessmentState.AutoAdopted)
+            && cycle.AllowsSubmission(hasLateOverride);
 
         return new MemberAssessmentView(
             AssessmentId: current.Assessment.Id,

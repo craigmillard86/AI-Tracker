@@ -82,6 +82,17 @@ public sealed class AssessmentScore
         ManagerComment = comment;
     }
 
+    /// <summary>Cycle-close auto-adoption (FR-068): copies the self score into the moderated
+    /// (<see cref="ManagerScore"/>) slot with NO comment. The divergence is definitionally zero, so this
+    /// never trips the FR-009 comment rule; kept as a distinct, intention-revealing mutator (rather than
+    /// <c>SetManager(SelfScore, null)</c>) so an auto-adopted score of record reads unambiguously as
+    /// adopted-not-moderated, and so no accidental non-zero manager value can be passed on this path.</summary>
+    public void AdoptSelf()
+    {
+        ManagerScore = SelfScore;
+        ManagerComment = null;
+    }
+
     /// <summary>The divergence (|self − manager|) at or above which a manager comment is mandatory
     /// (FR-009). A named constant so the domain rule and any UI hint that mirrors it cannot drift.</summary>
     public const int DivergenceCommentThreshold = 2;

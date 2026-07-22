@@ -33,6 +33,12 @@ public static class AuthorizationServiceCollectionExtensions
         // audit). Wraps the same request-scoped store/gateway/context — a cross-person read never escapes
         // the seam.
         services.AddScoped<ManagerModerationService>();
+
+        // The cycle-close processor (HAP-10): auto-adoption + rollup snapshots + frozen suppression.
+        // It implements Hap.Infrastructure's ICycleCloseProcessor port but LIVES here because it reads
+        // moderated scores (seam-only, research D1); CycleService.CloseAsync resolves it and runs it in
+        // the close transaction. Scoped — same request-scoped HapDbContext as the rest of the seam.
+        services.AddScoped<Hap.Infrastructure.Cycles.ICycleCloseProcessor, CycleCloseProcessor>();
         return services;
     }
 }

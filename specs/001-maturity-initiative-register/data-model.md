@@ -128,7 +128,7 @@ Entities mapped from spec Key Entities + FRs. PostgreSQL via EF Core, forward-on
 ## Key state machines
 
 - **Cycle**: Draft → Open → Closed. Close triggers: auto-adoption (FR-068), rollup snapshotting + suppression verdicts, calibration deltas.
-- **Assessment**: NotStarted → InProgress → Submitted → (Moderated | AutoAdopted). Late override (manager or admin) reopens Submitted → Moderated only while cycle open + override flag after close.
+- **Assessment**: NotStarted → InProgress → Submitted → (Moderated | AutoAdopted). A late override (manager or admin) reopens moderation post-close: a **Submitted** report → Moderated, and — since close has by then auto-adopted (FR-068) — an **AutoAdopted** report may also be re-moderated → Moderated (clearing the unmoderated flag). See Q-022. (Moderated is terminal; the frozen close-time RollupSnapshot is unaffected — reconciliation is "as of close", Q-022 addendum.)
 - **Initiative stage**: Idea → Evaluation → Pilot → Production → Scaled → Retired, forward-only; Retired terminal.
 
 ## Scale assumptions
