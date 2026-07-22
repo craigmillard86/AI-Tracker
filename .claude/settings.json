@@ -1,15 +1,5 @@
 {
   "hooks": {
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cost_log.py\""
-          }
-        ]
-      }
-    ],
     "SessionEnd": [
       {
         "hooks": [

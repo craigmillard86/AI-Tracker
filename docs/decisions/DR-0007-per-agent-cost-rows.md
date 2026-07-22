@@ -1,6 +1,6 @@
 # DR-0007 — Cost rows are written per agent on completion; the lead's row at session end
 
-**Date:** 2026-07-21 · **Status:** Accepted · **Scope:** Constitution "The join" + Art. (money mechanics) (PATCH: 1.2.0 → 1.2.1) + CLAUDE.md §§4, 12 + `scripts/cost_log.py` + `.claude/settings.json`
+**Date:** 2026-07-21 · **Status:** Superseded (mechanism) by [DR-0008](DR-0008-cost-attribution-sessionend-batch.md) 2026-07-22 — the per-story + session-lead *intent* stands; the per-`SubagentStop` *mechanism* below did not work at runtime (`transcript_path` is the shared main transcript, not the subagent's), producing 1,625 duplicate zero-cost rows. Read DR-0008 for the mechanism now in force. · **Scope:** Constitution "The join" + Art. (money mechanics) (PATCH: 1.2.0 → 1.2.1) + CLAUDE.md §§4, 12 + `scripts/cost_log.py` + `.claude/settings.json`
 **Story key:** n/a (owner-directed tooling amendment) · **Origin:** owner request 2026-07-21
 
 ## Context

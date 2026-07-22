@@ -8,7 +8,7 @@ operating model (surfaces of truth · five-phase lifecycle · risk-scaled review
 adapted for a FULLY LOCAL build: no Jira, no Azure, no external services required to deliver.
 -->
 
-**Version:** 1.2.1 · **Ratified:** 2026-07-20 · **Last amended:** 2026-07-21 (DR-0001, DR-0002, DR-0003, DR-0007) · **Owner:** Craig Millard (Vanguard)
+**Version:** 1.2.2 · **Ratified:** 2026-07-20 · **Last amended:** 2026-07-22 (DR-0001, DR-0002, DR-0003, DR-0007, DR-0008) · **Owner:** Craig Millard (Vanguard)
 **Story key:** `HAP` (local identifier scheme; survives unchanged if a tracker is adopted later)
 
 ## Preamble
@@ -34,7 +34,7 @@ Nothing is duplicated as a source. Each surface is authoritative for exactly one
 | **Wiki** (`docs/wiki/`) | HOW IT WORKS, AS BUILT | One page per subsystem, describing shipped behaviour (per DR-0003). A derived surface: it explains the system that exists; it never restates the spec (WHAT/WHY), the backlog (status), or decision records (why decided). Updated in the closure commit of any story that changes that subsystem — a stale wiki page is drift |
 | **User guide** (`docs/user-guide/` + in-app help content) | HOW USERS OPERATE IT | End-user documentation for the mandated flows (per DR-0003; spec FR-072/FR-073). In-app help content is versioned data per Art. II.4; the printable guide is updated in the closure commit of any story changing user-facing behaviour |
 
-**The join:** the story key is the foreign key of the whole operation. Branch `HAP-N-fr-x-slug`, commit `feat(HAP-N): … [FR-X]`, story file `docs/backlog/HAP-N-*.md`. The `[FR-ID]` travels beside the key in every commit so traceability to requirements survives any future re-tooling. The cost hook writes a row per agent as it completes, tagging its spend to the story via its worktree branch `HAP-N`; the session lead's own spend is written at session end as `session-lead` (DR-0007).
+**The join:** the story key is the foreign key of the whole operation. Branch `HAP-N-fr-x-slug`, commit `feat(HAP-N): … [FR-X]`, story file `docs/backlog/HAP-N-*.md`. The `[FR-ID]` travels beside the key in every commit so traceability to requirements survives any future re-tooling. The cost hook writes, at session end, one row per story — summed from each agent's own transcript and tagged by the `HAP-N` key dominating it — plus one `session-lead` row for the orchestration loop (DR-0008, superseding DR-0007's per-completion mechanism).
 
 ## Article II — Spec Before Code, Always
 
@@ -94,7 +94,7 @@ Three signals, captured separately, **never back-filled from each other** — th
 
 1. **The plan:** human-equivalent T-shirt Original Estimate in each story's frontmatter (DEV and QA lines; QA ≈ ⅓–⅕ of Dev), set at Phase 1, never revised after work starts.
 2. **The measurement:** AI wall-clock worklog entries in the story frontmatter — UTC timestamp at in-progress, another at close, difference logged; floor 1 minute, sanity check at 4× estimate. Never "felt like" time. Lost timestamp = log nothing, say so.
-3. **The bill:** the cost hook appends token spend to `.claude/cost-log.csv` — one row per agent on completion (tagged to its story via the worktree branch) plus one `session-lead` row at session end for the orchestration loop (DR-0007). Gitignored, never hand-edited. Joined with worklogs → $/story and $/hour — the platform's own delivery becomes an AI-adoption data point HIG can cite.
+3. **The bill:** the cost hook appends token spend to `.claude/cost-log.csv` at session end — one row per story (summed from each agent's own transcript, tagged by its dominant `HAP-N` key, priced from a maintained rate table) plus one `session-lead` row for the orchestration loop (DR-0008, superseding DR-0007). Gitignored, written once per session, never hand-edited. Joined with worklogs → $/story and $/hour — the platform's own delivery becomes an AI-adoption data point HIG can cite.
 
 ## Article IX — Engineering Standards
 
