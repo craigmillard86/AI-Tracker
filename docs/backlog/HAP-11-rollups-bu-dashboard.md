@@ -5,12 +5,22 @@ epic: E2-assessment
 wave: 1
 fr: [FR-013, FR-015, FR-016, FR-017, FR-018, FR-019, FR-041]
 risk: L3                # trigger: aggregate read paths over AssessmentScores via the seam
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-22T14:43:56Z, end: 2026-07-22T17:12:53Z, mins: 148}
   - {phase: qa, start: 2026-07-22T17:15:01Z, end: 2026-07-22T17:47:39Z, mins: 32}
-closure: null
+closure:
+  sha: 762d879
+  date: 2026-07-22
+  risk: L3
+  files: 37  # seam rollup reads (RollupReads, RollupPipeline, HierarchySuppression, RollupEndpoints), CycleCloseProcessor refactor, dashboard UI (StatTile/DimensionBar/TrendSparkline/SuppressedCell + DashboardScreen), tests
+  tests: backend 254+ (Category=PrivacyReporting incl. hierarchy-suppression fuzz + exact-oracle); frontend 138; no migration
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team, hap-design-reviewer]  # L3+design; 2 rounds, clean at c56fdee
+  qa: hap-qa PASS — differencing attacked on the REAL canonical directory (no leak), recompute-vs-dashboard matched 9dp (non-uniform fixture), SC-006 live path @~10k ≈186ms
+  decisions: [Q-024 aggregate scope via FR-022 anchors (G1-ratify), Q-026 hierarchy-global suppression (no DR — hardens D2)]
+  g1_residuals: "cross-cycle trend differencing; inherent k=4 floor; laminar-partition assumption — owner ratification at G1"
+  open: "Q-025 (FR-018 per-dimension histogram) — owner ruling, provisional-in-effect; F2 carry-forward from HAP-10 now CLOSED (structural seam-boundary guard)"
 ---
 ## Story
 As a BU Lead (and Group/Portfolio/Executive at their scopes), I see moderated maturity rolled up per dimension — mean, floor distribution, trend, completion — with suppression rendered honestly, so leadership reads real signal without ever being able to infer an individual's score.
