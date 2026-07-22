@@ -1,0 +1,153 @@
+using Hap.Domain.Assessments;
+using Hap.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
+namespace Hap.Api.Authorization;
+
+/// <summary>
+/// The sole implementation of <see cref="IAssessmentStore"/>/<see cref="ISelfAssessmentStore"/> and —
+/// by construction and two architecture tests — the ONLY type in the codebase that queries the
+/// <c>assessments</c>/<c>assessment_scores</c> tables. <c>HapDbContext</c> exposes no public
+/// <c>DbSet&lt;Assessment&gt;</c>; every access here goes through <c>db.Set&lt;&gt;()</c>. Two guards
+/// back this claim (research D1): <c>SeamBoundaryTests</c> is a source scan that fails the build if the
+/// <c>Set&lt;&gt;()</c> query surface appears outside <c>Hap.Api/Authorization/**</c> (a regex over the
+/// tree, not a type-system proof), and <c>SeamStoreImplementationTests</c> asserts by reflection that
+/// this is the only production type implementing either storage port. Neither is a compiler guarantee;
+/// together they make an out-of-seam query path a build failure rather than a silent leak.
+/// </summary>
+public sealed class SeamAssessmentStore : IAssessmentStore, ISelfAssessmentStore
+{
+    private readonly HapDbContext _db;
+
+    public SeamAssessmentStore(HapDbContext db) => _db = db;
+
+    private IQueryable<Assessment> Assessments => _db.Set<Assessment>();
+    private IQueryable<AssessmentScore> Scores => _db.Set<AssessmentScore>();
+
+    public async Task<IReadOnlyList<AssessmentScore>> GetIndividualScoresAsync(
+        Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default)
+    {
+        var assessmentId = await Assessments
+            .Where(a => a.PersonId == subjectPersonId && a.CycleId == cycleId)
+            .Select(a => (Guid?)a.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (assessmentId is null)
+        {
+            return Array.Empty<AssessmentScore>();
+        }
+
+        return await Scores.AsNoTracking()
+            .Where(s => s.AssessmentId == assessmentId.Value)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AssessmentWithScores?> GetSelfAsync(
+        Guid personId, Guid cycleId, CancellationToken cancellationToken = default)
+    {
+        var assessment = await Assessments.AsNoTracking()
+            .SingleOrDefaultAsync(a => a.PersonId == personId && a.CycleId == cycleId, cancellationToken);
+        if (assessment is null)
+        {
+            return null;
+        }
+
+        var scores = await Scores.AsNoTracking()
+            .Where(s => s.AssessmentId == assessment.Id)
+            .ToListAsync(cancellationToken);
+        return new AssessmentWithScores(assessment, scores);
+    }
+
+    public async Task<IReadOnlyList<AssessmentScore>> GetSelfScoresForCycleAsync(
+        Guid personId, Guid cycleId, CancellationToken cancellationToken = default)
+    {
+        var assessmentId = await Assessments.AsNoTracking()
+            .Where(a => a.PersonId == personId && a.CycleId == cycleId)
+            .Select(a => (Guid?)a.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (assessmentId is null)
+        {
+            return Array.Empty<AssessmentScore>();
+        }
+
+        return await Scores.AsNoTracking()
+            .Where(s => s.AssessmentId == assessmentId.Value)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task UpsertSelfScoresAsync(
+        Guid personId, Guid cycleId, IReadOnlyList<SelfScoreInput> scores, CancellationToken cancellationToken = default)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var assessment = await Assessments
+            .SingleOrDefaultAsync(a => a.PersonId == personId && a.CycleId == cycleId, cancellationToken);
+
+        if (assessment is null)
+        {
+            assessment = Assessment.Start(cycleId, personId);
+            _db.Add(assessment);
+        }
+        else if (assessment.State == AssessmentState.Submitted)
+        {
+            throw new AssessmentAlreadySubmittedException(personId, cycleId);
+        }
+
+        var existing = await Scores
+            .Where(s => s.AssessmentId == assessment.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var input in scores)
+        {
+            var row = existing.SingleOrDefault(s => s.DimensionId == input.DimensionId);
+            if (row is null)
+            {
+                _db.Add(AssessmentScore.CreateSelf(assessment.Id, input.DimensionId, input.Score, input.Evidence));
+            }
+            else
+            {
+                row.SetSelf(input.Score, input.Evidence);
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    public async Task SubmitSelfAsync(
+        Guid personId, Guid cycleId, IReadOnlyCollection<Guid> requiredDimensionIds, CancellationToken cancellationToken = default)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var assessment = await Assessments
+            .SingleOrDefaultAsync(a => a.PersonId == personId && a.CycleId == cycleId, cancellationToken);
+        if (assessment is null)
+        {
+            // Nothing entered yet — treat as "incomplete" (0 of N) rather than a not-found, so the
+            // caller gets the same 422 as a partially-filled assessment.
+            throw new AssessmentIncompleteException(0, requiredDimensionIds.Count);
+        }
+
+        if (assessment.State == AssessmentState.Submitted)
+        {
+            throw new AssessmentAlreadySubmittedException(personId, cycleId);
+        }
+
+        var scoredDimensionIds = await Scores
+            .Where(s => s.AssessmentId == assessment.Id)
+            .Select(s => s.DimensionId)
+            .ToListAsync(cancellationToken);
+
+        var scoredSet = scoredDimensionIds.ToHashSet();
+        var scoredRequired = requiredDimensionIds.Count(scoredSet.Contains);
+        if (scoredRequired < requiredDimensionIds.Count)
+        {
+            throw new AssessmentIncompleteException(scoredRequired, requiredDimensionIds.Count);
+        }
+
+        assessment.Submit(); // InProgress → Submitted (throws AssessmentStateException if not InProgress)
+        await _db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+}

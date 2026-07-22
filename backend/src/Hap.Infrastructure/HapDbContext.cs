@@ -11,8 +11,11 @@ namespace Hap.Infrastructure;
 /// manual-override layer, role grants, and the append-only audit log. Migration #2 (HAP-6)
 /// chains behind it with the framework engine (Framework/FrameworkVersion/Dimension/
 /// LevelDescriptor — FR-001/FR-054). Migration #3 (HAP-7) chains behind that with cycle
-/// management (Cycle/CycleInvitation/CycleLateOverride — FR-002/003/005). Later stories chain
-/// forward-only migrations behind this one.
+/// management (Cycle/CycleInvitation/CycleLateOverride — FR-002/003/005). Migration #4 (HAP-8)
+/// chains behind that with the assessment tables (data-model.md's assessment + score entities) —
+/// mapped via <c>ApplyConfiguration</c> (see <c>Persistence.AssessmentConfiguration</c>) rather than
+/// inline here, and deliberately WITHOUT a public DbSet: those tables are queried only through the
+/// visibility seam's store (research D1). Later stories chain forward-only migrations behind this one.
 ///
 /// Note the deliberate asymmetry on <see cref="AuditLogs"/>: the entity is immutable (no
 /// setters) and no code path calls Update/Remove on this set — enforced by
@@ -246,5 +249,12 @@ public class HapDbContext : DbContext
             e.HasOne<Person>().WithMany().HasForeignKey(x => x.GrantedByPersonId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        // The assessment tables (HAP-8). Applied from a dedicated configuration class so this context file
+        // never spells the bare assessment/score type tokens the seam-boundary guard forbids outside the
+        // seam; that mapping file is the single allowlisted schema-config location. No DbSet is exposed —
+        // the seam's store is the only query path (research D1).
+        modelBuilder.ApplyConfiguration(new Persistence.AssessmentConfiguration());
+        modelBuilder.ApplyConfiguration(new Persistence.AssessmentScoreConfiguration());
     }
 }

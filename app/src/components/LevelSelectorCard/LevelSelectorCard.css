@@ -1,0 +1,134 @@
+/* LevelSelectorCard — DESIGN.md A8. Built exclusively from tokens.css; no new colours, radii,
+   shadows, or type sizes. */
+
+.level-card {
+  position: relative;
+  display: block;
+  border: 1.5px solid var(--color-border-gray);
+  border-radius: var(--radius-card);
+  padding: var(--space-md-sm);
+  background: var(--color-pure-white);
+  cursor: pointer;
+}
+
+.level-card:hover {
+  border-color: var(--color-light-teal-accent);
+}
+
+/* Read-only cycle (closed without a late override): match the A4 disabled convention used on
+   .assessment-btn:disabled — 40% opacity, not-allowed cursor, no hover affordance, no colour change. */
+.level-card-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.level-card-disabled:hover {
+  border-color: var(--color-border-gray);
+}
+
+.level-card:focus-within {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}
+
+.level-card-selected {
+  border-color: var(--color-brand-teal);
+  border-width: 2px;
+}
+
+.level-card-prior {
+  border-style: dashed;
+}
+
+.level-card-prior-pill {
+  position: absolute;
+  top: -9px;
+  right: var(--space-sm);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  background: var(--color-ice-blue-surface);
+  color: var(--color-slate-text);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  line-height: 18px;
+}
+
+.level-card-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.level-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-button-weight);
+}
+
+.level-badge-0 {
+  background: var(--color-level-0);
+  color: var(--color-page-black);
+}
+
+.level-badge-1 {
+  background: var(--color-level-1);
+  color: var(--color-deep-navy);
+}
+
+.level-badge-2 {
+  background: var(--color-level-2);
+  color: var(--color-pure-white);
+}
+
+.level-badge-3 {
+  background: var(--color-level-3);
+  color: var(--color-pure-white);
+}
+
+.level-badge-lg {
+  min-width: 56px;
+  height: 44px;
+  font-size: var(--type-card-title-size);
+  border-radius: var(--radius-input);
+}
+
+.level-card-check {
+  width: 16px;
+  height: 16px;
+  color: var(--color-brand-teal);
+  flex: none;
+}
+
+.level-card-name {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  color: var(--color-slate-text);
+}
+
+.level-card-desc {
+  display: block;
+  font-size: var(--type-table-cell-size);
+  line-height: var(--type-table-cell-line);
+  color: var(--color-slate-text);
+}

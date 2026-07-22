@@ -62,6 +62,7 @@ app.MapIdentityEndpoints(api);
 api.MapAdminEndpoints();
 api.MapFrameworkEndpoints();
 api.MapCycleEndpoints();
+api.MapAssessmentEndpoints();
 
 app.Run();
 

@@ -1,0 +1,25 @@
+/* PurposeBanner — DESIGN.md A8: ice-blue surface fill, slate text, brand-teal icon. */
+
+.purpose-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--color-ice-blue-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-md) var(--space-md-lg);
+}
+
+.purpose-banner-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--color-brand-teal);
+}
+
+.purpose-banner-text {
+  margin: 0;
+  font-size: var(--type-table-cell-size);
+  line-height: var(--type-table-cell-line);
+  color: var(--color-slate-text);
+}

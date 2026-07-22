@@ -1,4 +1,5 @@
 using Hap.Api.Authorization;
+using Hap.Domain.Assessments;
 using Hap.Domain.Org;
 using Xunit;
 
@@ -23,7 +24,7 @@ public sealed class AssessmentReadsGatewayTests
         {
             Calls++;
             return Task.FromResult<IReadOnlyList<AssessmentScore>>(
-                new[] { new AssessmentScore(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, 2) });
+                new[] { AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), 2, null) });
         }
     }
 

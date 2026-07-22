@@ -1,3 +1,4 @@
+using Hap.Domain.Assessments;
 using Hap.Domain.Org;
 
 namespace Hap.Api.Authorization;

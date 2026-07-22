@@ -3,10 +3,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import { strings } from '../strings';
 
-function installMeFetchMock(status: number, body: unknown): void {
+/** Routes by URL so the authenticated path can answer both `/api/me` (session) and
+ * `/api/me/assessment` (AssessmentSelfScreen, mounted inside AppShell as of HAP-8). */
+function installMeFetchMock(meStatus: number, meBody: unknown): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve(new Response(status === 204 ? null : JSON.stringify(body), { status }))),
+    vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url === '/api/me') {
+        return Promise.resolve(
+          new Response(meStatus === 204 ? null : JSON.stringify(meBody), { status: meStatus }),
+        );
+      }
+      if (url === '/api/me/assessment') {
+        // No open cycle — keeps the authenticated-path assertion focused on session gating.
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      return Promise.reject(new Error(`unexpected fetch ${url}`));
+    }),
   );
 }
 

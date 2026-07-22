@@ -62,3 +62,90 @@ export async function fetchMe(): Promise<MeResponse | null> {
   }
   return (await response.json()) as MeResponse;
 }
+
+/**
+ * Self-assessment endpoints (HAP-8; contracts/api.md "Self scope"). Types mirror
+ * `Hap.Api.SelfAssessmentResponse` et al. exactly (System.Text.Json camelCase) — the subject is
+ * always the authenticated caller, so no personId is ever sent from the client.
+ */
+
+export interface SelfLevelResponse {
+  level: number;
+  levelName: string;
+  descriptorText: string;
+}
+
+export interface SelfDimensionResponse {
+  dimensionId: string;
+  key: string;
+  name: string;
+  displayOrder: number;
+  levels: SelfLevelResponse[];
+  selfScore: number | null;
+  selfEvidence: string | null;
+  priorScore: number | null;
+}
+
+export interface SelfAssessmentResponse {
+  cycleId: string;
+  cycleName: string;
+  cycleState: string;
+  submitted: boolean;
+  /** False when the cycle no longer accepts this caller's writes (closed without a late override) or
+   * the assessment is already submitted — the form is rendered read-only rather than surfacing the
+   * lock only on Save/Submit. */
+  editable: boolean;
+  purposeLimitationKey: string;
+  dimensionCount: number;
+  dimensions: SelfDimensionResponse[];
+}
+
+export interface ScoreEntry {
+  dimensionId: string;
+  score: number;
+  evidence: string | null;
+}
+
+/** Thrown by the assessment write calls with the response's HTTP status so the caller can map it
+ * to the right inline message (422 out-of-range/incomplete, 409 already submitted, 423 locked). */
+export class AssessmentWriteError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`assessment write failed (${status})`);
+    this.status = status;
+  }
+}
+
+/** GET /api/me/assessment. Returns null for a 404 (no cycle currently open) rather than
+ * throwing — that is an expected steady state the screen renders explicitly, not an error. */
+export async function fetchSelfAssessment(): Promise<SelfAssessmentResponse | null> {
+  const response = await fetch('/api/me/assessment');
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/me/assessment failed (${response.status})`);
+  }
+  return (await response.json()) as SelfAssessmentResponse;
+}
+
+/** PUT /api/me/assessment/scores — partial-progress upsert (save draft). */
+export async function saveSelfAssessmentScores(scores: ScoreEntry[]): Promise<void> {
+  const response = await fetch('/api/me/assessment/scores', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scores }),
+  });
+  if (response.status !== 204) {
+    throw new AssessmentWriteError(response.status);
+  }
+}
+
+/** POST /api/me/assessment/submit — no body; subject and cycle are derived from the session. */
+export async function submitSelfAssessment(): Promise<void> {
+  const response = await fetch('/api/me/assessment/submit', { method: 'POST' });
+  if (response.status !== 204) {
+    throw new AssessmentWriteError(response.status);
+  }
+}

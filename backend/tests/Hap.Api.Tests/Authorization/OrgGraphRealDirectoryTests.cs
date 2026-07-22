@@ -1,4 +1,5 @@
 using Hap.Api.Authorization;
+using Hap.Domain.Assessments;
 using Hap.Domain.Org;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Directory;
@@ -85,22 +86,22 @@ public sealed class OrgGraphRealDirectoryTests
         Assert.False(gateway.AuthorizeIndividualRead(graph, CallerContext.Ungranted(groupLeader), seedInd).Allowed);
     }
 
-    // === PINNING TEST — the TRUE residual of Q-015 PART 1 (L3 round-3, hap-red-team) ================
+    // === PINNING TEST — the one-hop above-BU direct read, RATIFIED per DR-0005 =======================
     // What is CLOSED: the gross transitive/subtree over-grant (an above-BU leader reading individuals
-    // several hops down — see the test above). What is NOT closed: an ungranted hierarchy above-BU leader
+    // several hops down — see the test above). What DR-0005 RATIFIES as ALLOW (owner ruling 2026-07-21,
+    // docs/decisions/DR-0005-above-bu-direct-report-read.md): an ungranted hierarchy above-BU leader
     // (Portfolio/Group Leader — the generator seeds them NO explicit OrgRole grant, only Platform Admin and
     // HIG Executive get grants) falls through ClassifyReader to Manager (they "have direct reports"), so they
     // CAN read the individual scores of their IMMEDIATE DIRECT reports — a Group Leader reads their
-    // direct-report BU Lead; a Portfolio Leader reads their direct-report Group Leader. Distinguishing such a
-    // hierarchy leader from an ordinary Manager needs the Q-014 "leads this unit" anchor; the only code
-    // alternative is denying ALL ungranted direct-manager reads, which breaks the core FR-025 clause-1
-    // manager grant. Whether clause-2 should ALSO deny this one-hop read is a genuine spec ambiguity and an
-    // OWNER decision at G1 (QUESTIONS.md Q-015 ruling; G1 witness must show these ALLOWs).
-    //
-    // This test PINS the current behavior as ALLOW. When Q-014 lands a structural anchor AND the owner rules
-    // restrictive at G1, these assertions FLIP to Assert.False — this test is the visible tripwire for that.
+    // direct-report BU Lead; a Portfolio Leader reads their direct-report Group Leader. This is a direct
+    // line-manager read for moderation, and the owner ratified it as intended behaviour: transitive/subtree
+    // reads stay denied, the broad above-BU view stays aggregates-only, and the one-hop direct read is
+    // allowed regardless of tier. This test now DOCUMENTS the ratified behaviour (Q-015 resolved, block
+    // lifted); the assertions are unchanged from when it pinned the residual — the framing, not the
+    // behaviour, is what DR-0005 settled. (Q-014's real-org caveat is a deferred, separate concern: on real
+    // org shapes an above-BU BU-wide read still needs an explicit grant — fine for the synthetic build.)
     [Fact]
-    public async Task PINNED_ungranted_above_BU_hierarchy_leader_CAN_read_immediate_direct_report_pending_Q014_G1()
+    public async Task PINNED_ungranted_above_BU_hierarchy_leader_CAN_read_immediate_direct_report_ratified_DR0005()
     {
         await SyncCanonicalAsync();
         var (graph, idOf, _) = await LoadAsync();
@@ -110,11 +111,11 @@ public sealed class OrgGraphRealDirectoryTests
         var groupLeader = idOf(Distributions.GroupLeaderRef(1));         // HAP-GRP-01 (direct report of PF-01)
         var buLead = idOf(Distributions.BuLeadRef(1));                   // HAP-BUL-01 (direct report of GRP-01)
 
-        // CURRENTLY ALLOWED (the residual). FLIP TO Assert.False when Q-014 + an owner-restrictive G1 ruling land:
+        // RATIFIED ALLOW per DR-0005 — a direct line-manager read for moderation, allowed regardless of tier:
         Assert.True(gateway.AuthorizeIndividualRead(graph, CallerContext.Ungranted(groupLeader), buLead).Allowed,
-            "Group Leader reading their direct-report BU Lead — residual one-hop read, pending Q-014/G1 (Q-015).");
+            "Group Leader reading their direct-report BU Lead — one-hop direct read, ratified ALLOW (DR-0005).");
         Assert.True(gateway.AuthorizeIndividualRead(graph, CallerContext.Ungranted(portfolioLeader), groupLeader).Allowed,
-            "Portfolio Leader reading their direct-report Group Leader — residual one-hop read, pending Q-014/G1 (Q-015).");
+            "Portfolio Leader reading their direct-report Group Leader — one-hop direct read, ratified ALLOW (DR-0005).");
 
         // CONTRAST — the gross over-grant that IS closed now: the SAME Portfolio Leader cannot reach two hops
         // down to the BU Lead (transitive), even though the chain makes them an ancestor.

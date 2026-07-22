@@ -8,41 +8,67 @@ using Xunit;
 namespace Hap.Architecture.Tests;
 
 /// <summary>
-/// The seam-isolation guard (research D1, HAP-5 AC): the assessment entity types
-/// (<c>Assessment</c>/<c>AssessmentScore</c>) and their table names may be referenced ONLY inside
-/// <c>backend/src/Hap.Api/Authorization/**</c> — the visibility seam. Any other production namespace
-/// naming them is a query path that could bypass the authorisation layer, so the build must fail.
+/// The seam-isolation guard (research D1, HAP-5 AC; extended by HAP-8 with the migration). The
+/// assessment entity types (<c>Assessment</c>/<c>AssessmentScore</c>), their table names, and — new in
+/// HAP-8 — their <c>DbSet</c>/<c>Set&lt;&gt;()</c> QUERY SURFACE may be referenced ONLY inside a small,
+/// enumerated set of sanctioned locations. Any other production file naming them is a query path that
+/// could bypass the authorisation layer, so the build must fail.
+///
+/// <para><b>Sanctioned locations (allowlist).</b> Each is a definition/schema/query-inside-the-seam
+/// location, never an ad-hoc read path:
+/// <list type="bullet">
+/// <item><c>backend/src/Hap.Api/Authorization/</c> — the visibility seam (the gateway + the ONE store
+/// that holds the <c>Set&lt;&gt;()</c> query surface).</item>
+/// <item><c>backend/src/Hap.Domain/Assessments/</c> — where the entity TYPES are DEFINED (HAP-8
+/// relocation, HAP-5 handoff). Defining a type is not a query path.</item>
+/// <item><c>Hap.Infrastructure/Persistence/AssessmentEntityConfiguration.cs</c> — the single EF
+/// schema-mapping file (<c>IEntityTypeConfiguration</c>), applied by <c>HapDbContext</c> so the context
+/// itself never spells the bare tokens. Mapping is schema, not a query.</item>
+/// <item><c>Hap.Infrastructure/Persistence/Migrations/</c> — generated DDL + model snapshot.</item>
+/// </list></para>
 ///
 /// <para>Matching is CASE-SENSITIVE on the PascalCase type identifiers (prose across the codebase uses
 /// lowercase "assessment" freely — that is documentation, not a query path) plus the underscored table
-/// name (which never occurs in prose). The DbSet form of this guard, and the full table-name coverage,
-/// are added by HAP-8 with the migration; today no DbSet or migration exists, so this guards the TYPE
-/// references that DO exist. Category=PrivacyReporting — it runs in the always-on regression suite.</para>
+/// name (case-insensitive; it never occurs in prose) plus the DbSet/Set query-surface forms.
+/// Category=PrivacyReporting — it runs in the always-on regression suite.</para>
 /// </summary>
 public class SeamBoundaryTests
 {
-    // The one namespace/folder permitted to name the assessment types.
-    private const string SeamMarker = "Hap.Api/Authorization/";
+    // Paths permitted to name the assessment types / table names / query surface. A file is allowed if
+    // its normalised path CONTAINS any one of these markers.
+    private static readonly string[] AllowedMarkers =
+    {
+        "Hap.Api/Authorization/",                                    // the visibility seam
+        "Hap.Domain/Assessments/",                                   // the entity type definitions
+        "Hap.Infrastructure/Persistence/AssessmentEntityConfiguration.cs", // the single EF-mapping file
+        "Hap.Infrastructure/Persistence/Migrations/",                // generated schema DDL + snapshot
+    };
 
     private static readonly Regex[] AssessmentReferencePatterns =
     {
         new(@"\bAssessments?\b", RegexOptions.Compiled),                          // Assessment / Assessments (type)
         new(@"\bAssessmentScores?\b", RegexOptions.Compiled),                     // AssessmentScore(s) (type)
-        new(@"\bassessment_scores?\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), // table name (forward-looking)
+        new(@"\bassessment_scores?\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), // table name
+        // The DbSet/Set query surface (HAP-8): the only forms that actually READ the tables. Explicit so
+        // the guard's intent — "no query path outside the seam" — is legible even though the bare-type
+        // patterns above already subsume them. `Set<Assessment>` also covers `Set<AssessmentScore>`.
+        new(@"DbSet<\s*Assessment", RegexOptions.Compiled),
+        new(@"\bSet<\s*Assessment", RegexOptions.Compiled),
     };
 
     [Fact]
     [Trait("Category", "PrivacyReporting")]
-    public void Assessment_types_are_referenced_only_inside_the_visibility_seam()
+    public void Assessment_types_and_query_surface_are_referenced_only_in_sanctioned_locations()
     {
         var files = RepoSource.CsFiles()
             .Select(path => (Path: path, Lines: File.ReadAllLines(path)));
 
-        var offenders = FindReferencesOutsideSeam(files, SeamMarker, AssessmentReferencePatterns);
+        var offenders = FindReferencesOutsideAllowlist(files, AllowedMarkers, AssessmentReferencePatterns);
 
         Assert.True(offenders.Count == 0,
-            "Assessment entity types/table names must be referenced only inside " + SeamMarker +
-            " (the visibility seam) — every other reference is a potential read path bypassing the " +
+            "Assessment entity types/table names/DbSet query surface must be referenced only inside the " +
+            "sanctioned locations (the visibility seam, the domain type definitions, the single EF-mapping " +
+            "file, and generated migrations) — every other reference is a potential read path bypassing the " +
             "authorisation layer (research D1). Offending lines:\n" + string.Join("\n", offenders));
     }
 
@@ -50,56 +76,70 @@ public class SeamBoundaryTests
 
     [Fact]
     [Trait("Category", "PrivacyReporting")]
-    public void Real_source_scan_is_not_vacuous_the_seam_itself_contains_the_tokens()
+    public void Real_source_scan_is_not_vacuous_the_sanctioned_locations_contain_the_tokens()
     {
-        // Scan the real files with a seam marker that matches NOTHING, so the seam's own Assessment
-        // references count as "outside". If this finds nothing, the guard above is passing vacuously
-        // (empty corpus, broken enumeration, or patterns that match nothing) — which would hide a real
-        // leak. The seam defines Assessment/AssessmentScore, so this MUST find matches.
+        // Scan the real files with an allowlist that matches NOTHING, so the sanctioned locations' own
+        // Assessment references count as "outside". If this finds nothing, the guard above is passing
+        // vacuously (empty corpus, broken enumeration, or patterns that match nothing) — which would hide
+        // a real leak. The seam + domain + mapping define/query these types, so this MUST find matches.
         var files = RepoSource.CsFiles()
             .Select(path => (Path: path, Lines: File.ReadAllLines(path)));
 
-        var matches = FindReferencesOutsideSeam(files, "____no_such_seam_dir____", AssessmentReferencePatterns);
+        var matches = FindReferencesOutsideAllowlist(
+            files, new[] { "____no_such_dir____" }, AssessmentReferencePatterns);
 
         Assert.True(matches.Count > 0,
-            "Expected the Assessment types to be referenced SOMEWHERE in backend/src (the seam defines " +
-            "them) — zero matches means the scan is vacuous and the boundary guard proves nothing.");
+            "Expected the Assessment types to be referenced SOMEWHERE in backend/src (the seam, the domain " +
+            "definitions, and the EF mapping name them) — zero matches means the scan is vacuous and the " +
+            "boundary guard proves nothing.");
     }
 
     // --- the guard's own negative-case proof: it is not vacuous --------------------------------
 
     [Fact]
     [Trait("Category", "PrivacyReporting")]
-    public void Guard_flags_a_reference_outside_the_seam_but_not_inside_it()
+    public void Guard_flags_a_reference_outside_the_sanctioned_locations_but_not_inside_them()
     {
-        // A synthetic "leak": a domain-layer file naming the type. The detector MUST catch it — proving
-        // the guard above would fail the build if such a reference were ever introduced.
+        // A synthetic "leak": a domain-layer file OUTSIDE the Assessments definition folder naming the
+        // type. The detector MUST catch it — proving the guard would fail the build if such a reference
+        // were ever introduced (e.g. a service querying the tables directly).
         var leak = ("backend/src/Hap.Domain/Leak.cs",
             new[] { "public sealed class Leak { private Assessment _a = null!; }" });
 
-        var caught = FindReferencesOutsideSeam(new[] { leak }, SeamMarker, AssessmentReferencePatterns);
+        var caught = FindReferencesOutsideAllowlist(new[] { leak }, AllowedMarkers, AssessmentReferencePatterns);
         Assert.Single(caught);
 
         // The identical content INSIDE the seam is allowed — proving the allowlist actually gates on path.
         var inSeam = ("backend/src/Hap.Api/Authorization/Leak.cs",
             new[] { "public sealed class Leak { private Assessment _a = null!; }" });
-        var allowed = FindReferencesOutsideSeam(new[] { inSeam }, SeamMarker, AssessmentReferencePatterns);
-        Assert.Empty(allowed);
+        Assert.Empty(FindReferencesOutsideAllowlist(new[] { inSeam }, AllowedMarkers, AssessmentReferencePatterns));
+
+        // …as is naming the type inside its definition folder (a definition is not a query path).
+        var inDefinition = ("backend/src/Hap.Domain/Assessments/Assessment.cs",
+            new[] { "public sealed class Assessment { }" });
+        Assert.Empty(FindReferencesOutsideAllowlist(new[] { inDefinition }, AllowedMarkers, AssessmentReferencePatterns));
+
+        // A raw DbSet query surface OUTSIDE the seam is caught by the DbSet-form patterns specifically.
+        var dbSetLeak = ("backend/src/Hap.Infrastructure/HapDbContext.cs",
+            new[] { "public DbSet<Assessment> Assessments => Set<Assessment>();" });
+        Assert.NotEmpty(FindReferencesOutsideAllowlist(new[] { dbSetLeak }, AllowedMarkers, AssessmentReferencePatterns));
     }
 
-    /// <summary>Pure detector: returns "path:line: 'pattern'" for every match in a file whose path does
-    /// not contain <paramref name="seamMarker"/>. Path separators are normalised so the check is
-    /// OS-agnostic.</summary>
-    internal static IReadOnlyList<string> FindReferencesOutsideSeam(
-        IEnumerable<(string Path, string[] Lines)> files, string seamMarker, IReadOnlyList<Regex> patterns)
+    /// <summary>Pure detector: returns "path:line: 'pattern'" for every match in a file whose normalised
+    /// path contains NONE of <paramref name="allowedMarkers"/>. Path separators are normalised so the
+    /// check is OS-agnostic.</summary>
+    internal static IReadOnlyList<string> FindReferencesOutsideAllowlist(
+        IEnumerable<(string Path, string[] Lines)> files,
+        IReadOnlyList<string> allowedMarkers,
+        IReadOnlyList<Regex> patterns)
     {
         var offenders = new List<string>();
         foreach (var (path, lines) in files)
         {
             var normalised = path.Replace('\\', '/');
-            if (normalised.Contains(seamMarker, StringComparison.Ordinal))
+            if (allowedMarkers.Any(marker => normalised.Contains(marker, StringComparison.Ordinal)))
             {
-                continue; // inside the seam — allowed
+                continue; // inside a sanctioned location — allowed
             }
             for (var i = 0; i < lines.Length; i++)
             {

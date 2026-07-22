@@ -1,3 +1,4 @@
+import { AssessmentSelfScreen } from '../screens/assessment-self/AssessmentSelfScreen';
 import { strings } from '../strings';
 
 const navItems: ReadonlyArray<string> = [
@@ -10,8 +11,10 @@ const navItems: ReadonlyArray<string> = [
 
 /**
  * The application frame per DESIGN.md A6: fixed deep-navy top bar, deep-navy left
- * nav, and a light content surface. Feature screens mount into the content area in
- * later stories. All copy comes from the externalised strings module (FR-067).
+ * nav, and a light content surface. The self-assessment screen (HAP-8) is the
+ * authenticated landing content; other feature screens mount into the content area
+ * in later stories. All chrome copy comes from the externalised strings module
+ * (FR-067).
  */
 export function AppShell(): JSX.Element {
   return (
@@ -42,8 +45,7 @@ export function AppShell(): JSX.Element {
         </nav>
 
         <main id="main-content" className="app-content">
-          <h1 className="app-page-title">{strings.home.title}</h1>
-          <p className="app-page-body">{strings.home.body}</p>
+          <AssessmentSelfScreen />
         </main>
       </div>
     </div>

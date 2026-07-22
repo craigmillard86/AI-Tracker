@@ -99,17 +99,3 @@ body {
   padding: var(--space-xl);
   background: var(--color-pure-white);
 }
-
-.app-page-title {
-  margin: 0 0 var(--space-md);
-  font-family: var(--font-family-display);
-  font-size: var(--type-page-title-size);
-  line-height: var(--type-page-title-line);
-  font-weight: var(--type-page-title-weight);
-  color: var(--color-page-black);
-}
-
-.app-page-body {
-  margin: 0;
-  color: var(--color-slate-text);
-}
