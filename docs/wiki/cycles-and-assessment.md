@@ -83,6 +83,21 @@ This runs **once** and is never recomputed, which is exactly why a BU onboarded 
 
 > **Backstop gap (carry-forward):** the row-level trigger does **not** fire on `TRUNCATE`, and the app role owns the tables, so `TRUNCATE` of a locked version's content is not rejected. Unreachable via any HTTP path today. A `BEFORE TRUNCATE` statement-level trigger (+ the `session_replication_role` reset coupling) must be added by the next story adding raw SQL near these tables, mirroring HAP-3's `audit_log_no_truncate`.
 
-## Close-time work (deferred to HAP-10)
+## Cycle close & rollups (HAP-10 — FR-068/069/070/015/016)
 
-`CycleService.CloseAsync` is currently a bare `Open → Closed` transition. contracts/api.md specifies close also runs auto-adoption (FR-068), rollup snapshots, and suppression verdicts — **HAP-10 must hook that into this `CloseAsync`** (Q-017), not build a parallel close path.
+`CycleService.CloseAsync` runs the whole close in ONE transaction, delegating to `ICycleCloseProcessor` (seam impl `CycleCloseProcessor` — reads scores only where the boundary guard permits): `Open → Closed` transition → auto-adopt → rollup snapshots → frozen suppression, one `SaveChanges`+commit. No parallel close path (Q-017 honoured).
+
+- **Auto-adopt (FR-068):** every `Submitted`-but-unmoderated assessment becomes `AutoAdopted` (self→manager scores via `AssessmentScore.AdoptSelf()`, `unmoderated=true`); `Moderated` untouched. AutoAdopted rows stay in means/floor but are **excluded from the calibration delta**. A senior leader with no eligible moderator (Q-020) falls through this same generic path — no special-casing.
+- **Departure escalation (FR-070):** a departed manager's pending reviews escalate to `ChainResolver.ReviewerOfRecord` (reused from HAP-9); still-unmoderated at close → auto-adopt.
+- **Scoring (FR-015/016, `Hap.Domain/Scoring`):** mean = arithmetic mean of the 7 dimensions to 2dp; floor = min dimension score; distribution by floor level. Pure domain maths, property-tested.
+- **Scored population vs completion denominator (§3.5/FR-024):** tracked as **separate** fields. A submitted/moderated mid-cycle leaver stays in per-dimension means + floor distribution (scored population) but leaves the completion denominator; both reconcile independently.
+
+### RollupSnapshot — immutable, frozen at close (research D4/D2)
+
+One `RollupSnapshot` per org node (Team / BU / Group / Portfolio / AllHig) per cycle, holding n, per-dimension means, floor distribution, completion %, unmoderated %, calibration delta, and the **suppression verdict** — computed once at close by REUSING the seam `SuppressionEvaluator` (never reimplemented) and **frozen**: shrinking a node below 4 after close never changes the stored verdict (FR-071 historical rule). Migration #5 makes the table **append-only** (row-level UPDATE/DELETE + `BEFORE TRUNCATE` statement-level triggers, mirroring `audit_log`; live-DB tested) with a **unique `(cycle, nodeType, nodeRef)` index** (`NULLS NOT DISTINCT`) so a racing second close collides and rolls back rather than duplicating immutable rows.
+
+> **Team partitioning (Q-023):** a Team node contains only reports **homed in the same BU as their manager**. Anyone without a same-BU manager — manager-less (BU heads) or **cross-BU-managed** — is **teamless**: counted at BU/Group/Portfolio/AllHig via their home BU, in no Team node. This keeps every Team nested in one BU, so `Σ(team-homed scored n) = BU's team-homed scored n` and the suppression `Σchild ≤ parent` precondition both hold. Their manager still reviews them normally (review authority unchanged — this only shapes the aggregate rollup node). Teamless people are absorbed into the BU-vs-teams complement, so N<4 differencing stays closed by suppression rule 2.
+
+> **Reconcile "as of close" (Q-022):** a post-close late override may **re-moderate an `AutoAdopted` assessment** (`Assessment.Moderate` accepts `Submitted OR AutoAdopted`; `Moderated` stays terminal), gated by the unchanged `moderation ⊆ read` + reviewer-of-record + submission-lock. This mutates the live rows, but the **frozen snapshot is authoritative** — any reconciliation reads it as-of-close, never against post-override live rows.
+
+> **Carry-forward to HAP-11 (G1 flag):** `RollupSnapshot` persists the true N/mean/distribution even for `Suppressed` rows, via a **public DbSet readable outside the seam**. Inert today (no snapshot read path exists), but a **hard precondition on HAP-11**: any snapshot read MUST project through the suppression verdict — no external projection may expose N/mean/distribution for a Suppressed row. A G1 witness item.

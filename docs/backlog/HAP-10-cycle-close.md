@@ -5,12 +5,21 @@ epic: E2-assessment
 wave: 1
 fr: [FR-068, FR-069, FR-070, FR-015, FR-016]
 risk: L3                # trigger: writes moderated scores + rollup/suppression computation over AssessmentScores
-status: qa
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-22T11:44:30Z, end: 2026-07-22T13:50:27Z, mins: 125}
   - {phase: qa, start: 2026-07-22T13:52:31Z, end: 2026-07-22T14:28:21Z, mins: 35}
-closure: null
+closure:
+  sha: 41b178f
+  date: 2026-07-22
+  risk: L3
+  files: 26  # domain scoring (MaturityScoring, RollupComputation) + Rollups (RollupSnapshot, OrgNodeType); close seam (CycleCloseProcessor, ICycleCloseProcessor); CycleService.CloseAsync; migration #5 (append-only + unique index); Assessment.AutoAdopt/AdoptSelf + widened Moderate; tests
+  tests: backend 438+ (Category=PrivacyReporting 208+); migration idempotent (runs twice, 2nd no-op); frontend green
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team]  # L3; 2 rounds, clean at a8a231e
+  qa: hap-qa PASS — recompute-vs-snapshot matched, <4 differencing defeated (rule-2 teamless complement), concurrent-close race → one snapshot, cycle RBAC gate holds
+  decisions: [Q-023 teamless/BU-direct rollup, Q-022 post-close override re-moderation + reconcile-as-of-close]
+  carry_forward: "F2 — RollupSnapshot exposes real N/mean/distribution for Suppressed rows via a public DbSet; HARD PRECONDITION on HAP-11 (snapshot reads MUST apply suppression) + G1 flag"
 ---
 ## Story
 As the platform, closing a cycle auto-adopts unmoderated self-scores (flagged), computes mean and floor-level rollups into immutable snapshots with suppression verdicts frozen at close, and escalates a departed manager's pending reviews — so history is complete, honest, and can never retro-expose anyone.
