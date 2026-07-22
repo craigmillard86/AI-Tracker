@@ -28,6 +28,11 @@ public static class AuthorizationServiceCollectionExtensions
         services.AddScoped<ISelfAssessmentStore>(sp => sp.GetRequiredService<SeamAssessmentStore>());
         services.AddScoped<AssessmentReads>();
         services.AddScoped<SelfAssessmentService>();
+        // The manager-scope moderation workflow (HAP-9): reviews queue, the [A] member read (fail-closed
+        // IndividualView audit), and the moderation write (submission-lock + Δ≥2 comment + ScoreChange
+        // audit). Wraps the same request-scoped store/gateway/context — a cross-person read never escapes
+        // the seam.
+        services.AddScoped<ManagerModerationService>();
         return services;
     }
 }

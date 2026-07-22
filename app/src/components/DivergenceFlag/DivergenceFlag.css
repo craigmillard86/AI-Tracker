@@ -1,0 +1,48 @@
+/* DivergenceFlag — DESIGN.md A2 (RAG status) + A8. Built exclusively from tokens.css; no new
+   colours, radii, shadows, or type sizes. */
+
+.divergence-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-button-weight);
+  white-space: nowrap;
+}
+
+.divergence-flag::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.divergence-flag-agree {
+  background: var(--color-ice-blue-surface);
+  color: var(--color-slate-text);
+}
+
+.divergence-flag-agree::before {
+  background: var(--color-slate-text);
+}
+
+.divergence-flag-mid {
+  background: var(--color-rag-amber-tint);
+  color: var(--color-rag-amber);
+}
+
+.divergence-flag-mid::before {
+  background: var(--color-rag-amber);
+}
+
+.divergence-flag-high {
+  background: var(--color-rag-red-tint);
+  color: var(--color-rag-red);
+}
+
+.divergence-flag-high::before {
+  background: var(--color-rag-red);
+}

@@ -25,11 +25,30 @@ public sealed class OrgGraphRealDirectoryTests
 
     public OrgGraphRealDirectoryTests(HapApiFactory factory) => _factory = factory;
 
+    // These gateway tests exercise only the AUTHORISATION decision, never a store fetch — the store must
+    // never be reached. Every method throws so a reach here is a loud test failure, not a silent pass.
     private sealed class NoStore : IAssessmentStore
     {
         public Task<IReadOnlyList<AssessmentScore>> GetIndividualScoresAsync(
             Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AssessmentScore>>(Array.Empty<AssessmentScore>());
+
+        public Task<AssessmentWithScores?> GetAssessmentWithScoresAsync(
+            Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AssessmentWithScores?> GetByIdWithScoresAsync(
+            Guid assessmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Assessment>> GetAssessmentsForPeopleAsync(
+            Guid cycleId, IReadOnlyCollection<Guid> personIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task ModerateAsync(
+            Guid assessmentId, Guid moderatedByPersonId, IReadOnlyList<ManagerScoreInput> decisions,
+            Hap.Domain.Audit.AuditLog auditRow, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private static AssessmentReads Gateway() =>

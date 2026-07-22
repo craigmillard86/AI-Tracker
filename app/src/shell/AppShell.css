@@ -93,6 +93,11 @@ body {
   background: var(--color-brand-teal);
 }
 
+.app-nav-item[aria-current='page'] {
+  background: var(--color-brand-teal);
+  font-weight: var(--type-button-weight);
+}
+
 .app-content {
   flex: 1 1 auto;
   max-width: 1440px;

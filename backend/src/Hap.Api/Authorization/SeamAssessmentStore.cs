@@ -1,4 +1,5 @@
 using Hap.Domain.Assessments;
+using Hap.Domain.Audit;
 using Hap.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,6 +41,103 @@ public sealed class SeamAssessmentStore : IAssessmentStore, ISelfAssessmentStore
         return await Scores.AsNoTracking()
             .Where(s => s.AssessmentId == assessmentId.Value)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AssessmentWithScores?> GetAssessmentWithScoresAsync(
+        Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default)
+    {
+        var assessment = await Assessments.AsNoTracking()
+            .SingleOrDefaultAsync(a => a.PersonId == subjectPersonId && a.CycleId == cycleId, cancellationToken);
+        if (assessment is null)
+        {
+            return null;
+        }
+
+        var scores = await Scores.AsNoTracking()
+            .Where(s => s.AssessmentId == assessment.Id)
+            .ToListAsync(cancellationToken);
+        return new AssessmentWithScores(assessment, scores);
+    }
+
+    public async Task<AssessmentWithScores?> GetByIdWithScoresAsync(
+        Guid assessmentId, CancellationToken cancellationToken = default)
+    {
+        var assessment = await Assessments.AsNoTracking()
+            .SingleOrDefaultAsync(a => a.Id == assessmentId, cancellationToken);
+        if (assessment is null)
+        {
+            return null;
+        }
+
+        var scores = await Scores.AsNoTracking()
+            .Where(s => s.AssessmentId == assessmentId)
+            .ToListAsync(cancellationToken);
+        return new AssessmentWithScores(assessment, scores);
+    }
+
+    public async Task<IReadOnlyList<Assessment>> GetAssessmentsForPeopleAsync(
+        Guid cycleId, IReadOnlyCollection<Guid> personIds, CancellationToken cancellationToken = default)
+    {
+        if (personIds.Count == 0)
+        {
+            return Array.Empty<Assessment>();
+        }
+
+        var ids = personIds as IReadOnlyList<Guid> ?? personIds.ToList();
+        return await Assessments.AsNoTracking()
+            .Where(a => a.CycleId == cycleId && ids.Contains(a.PersonId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task ModerateAsync(
+        Guid assessmentId,
+        Guid moderatedByPersonId,
+        IReadOnlyList<ManagerScoreInput> decisions,
+        AuditLog auditRow,
+        CancellationToken cancellationToken = default)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var assessment = await Assessments
+            .SingleOrDefaultAsync(a => a.Id == assessmentId, cancellationToken)
+            ?? throw new AssessmentNotFoundException(assessmentId);
+
+        // State is checked BEFORE any score write so a wrong-state moderation (re-moderating an already-
+        // Moderated assessment, or moderating one still InProgress) fails 409 without partially applying
+        // manager scores. Assessment.Moderate() re-asserts the same invariant as a backstop.
+        if (assessment.State != AssessmentState.Submitted)
+        {
+            throw new AssessmentStateException(assessment.Id, assessment.State, AssessmentState.Moderated);
+        }
+
+        var rows = await Scores
+            .Where(s => s.AssessmentId == assessmentId)
+            .ToListAsync(cancellationToken);
+        var rowByDimension = rows.ToDictionary(s => s.DimensionId);
+
+        foreach (var decision in decisions)
+        {
+            if (!rowByDimension.TryGetValue(decision.DimensionId, out var row))
+            {
+                throw new ModerationDimensionException(decision.DimensionId);
+            }
+            row.SetManager(decision.Score, decision.Comment); // FR-009 (comment@Δ≥2) + range → 422 in the seam
+        }
+
+        assessment.Moderate(moderatedByPersonId); // Submitted → Moderated; records moderator + instant
+        _db.AuditLogs.Add(auditRow);               // FR-050 ScoreChange, staged in the SAME tx (fail-closed)
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another moderation of this assessment committed first (xmin moved) — the whole unit of work
+            // (score writes + state transition + audit) rolls back, and the loser gets a clean 409.
+            throw new ModerationConflictException(assessmentId);
+        }
     }
 
     public async Task<AssessmentWithScores?> GetSelfAsync(
@@ -147,7 +245,17 @@ public sealed class SeamAssessmentStore : IAssessmentStore, ISelfAssessmentStore
         }
 
         assessment.Submit(); // InProgress → Submitted (throws AssessmentStateException if not InProgress)
-        await _db.SaveChangesAsync(cancellationToken);
-        await tx.CommitAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A concurrent submit of the same assessment won the race (xmin moved) — the loser's write
+            // rolls back and is reported as an already-submitted conflict (409), the same status the
+            // serialized double-submit path returns, so the race never surfaces a 500 (HAP-8 invariant).
+            throw new AssessmentAlreadySubmittedException(personId, cycleId);
+        }
     }
 }

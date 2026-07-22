@@ -124,6 +124,26 @@ public static class AssessmentEndpoints
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
         });
+
+        // GET /api/me/assessment/result — the caller's OWN moderated scores + comments + divergence
+        // (FR-012). Self-scope, not audited. 404 until the assessment is moderated/auto-adopted.
+        self.MapGet("/result", async (HttpContext http, SelfAssessmentService svc, CancellationToken ct) =>
+        {
+            if (!TryGetPersonId(http, out var personId))
+            {
+                return MissingPrincipal();
+            }
+
+            try
+            {
+                var result = await svc.GetResultAsync(personId, ct);
+                return result is null ? Results.NotFound() : Results.Ok(AssessmentResultResponse.From(result));
+            }
+            catch (NoCurrentCycleException)
+            {
+                return Results.NotFound();
+            }
+        });
     }
 
     // Matches IdentityEndpoints/CycleEndpoints: a missing/malformed person_id claim is a broken
@@ -188,5 +208,47 @@ public sealed record SelfAssessmentResponse(
                     d.SelfScore,
                     d.SelfEvidence,
                     d.PriorScore))
+                .ToList());
+}
+
+/// <summary>One dimension of the caller's moderated result (FR-012): self + moderated scores, the
+/// manager comment, and the divergence highlight.</summary>
+public sealed record ResultDimensionResponse(
+    Guid DimensionId,
+    string Key,
+    string Name,
+    int DisplayOrder,
+    IReadOnlyList<SelfLevelResponse> Levels,
+    int SelfScore,
+    int ManagerScore,
+    string? ManagerComment,
+    int Divergence);
+
+/// <summary>Body of GET /api/me/assessment/result — the caller's moderated scores, comments, and
+/// divergence highlights (FR-012). Returned only once the assessment is moderated/auto-adopted.</summary>
+public sealed record AssessmentResultResponse(
+    Guid CycleId,
+    string CycleName,
+    string State,
+    DateTime? ModeratedAt,
+    IReadOnlyList<ResultDimensionResponse> Dimensions)
+{
+    public static AssessmentResultResponse From(SelfAssessmentResultView view) =>
+        new(
+            view.CycleId,
+            view.CycleName,
+            view.State,
+            view.ModeratedAt,
+            view.Dimensions
+                .Select(d => new ResultDimensionResponse(
+                    d.DimensionId,
+                    d.Key,
+                    d.Name,
+                    d.DisplayOrder,
+                    d.Levels.Select(l => new SelfLevelResponse(l.Level, l.LevelName, l.DescriptorText)).ToList(),
+                    d.SelfScore,
+                    d.ManagerScore,
+                    d.ManagerComment,
+                    d.Divergence))
                 .ToList());
 }

@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AssessmentWriteError,
+  fetchAssessmentResult,
   fetchSelfAssessment,
   saveSelfAssessmentScores,
   submitSelfAssessment,
+  type AssessmentResultResponse,
   type SelfAssessmentResponse,
 } from '../../api/client';
+import { DivergenceFlag } from '../../components/DivergenceFlag/DivergenceFlag';
 import { LevelSelectorCard } from '../../components/LevelSelectorCard/LevelSelectorCard';
 import { ProgressStepper } from '../../components/ProgressStepper/ProgressStepper';
 import { PurposeBanner } from '../../components/PurposeBanner/PurposeBanner';
@@ -23,6 +26,7 @@ interface DimensionEdit {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type SubmitStatus = 'idle' | 'submitting' | 'error';
+type ResultLoadState = 'idle' | 'loading' | 'ready' | 'notReady' | 'error';
 
 function initialEdits(data: SelfAssessmentResponse): Record<string, DimensionEdit> {
   const edits: Record<string, DimensionEdit> = {};
@@ -82,6 +86,8 @@ export function AssessmentSelfScreen(): JSX.Element {
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
   const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
+  const [resultLoadState, setResultLoadState] = useState<ResultLoadState>('idle');
+  const [result, setResult] = useState<AssessmentResultResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +114,36 @@ export function AssessmentSelfScreen(): JSX.Element {
       cancelled = true;
     };
   }, []);
+
+  // FR-012: once submitted, check whether the manager has already moderated this cycle's
+  // assessment and, if so, show the moderated result inline rather than the plain confirmation.
+  useEffect(() => {
+    if (!submitted) {
+      return;
+    }
+    let cancelled = false;
+    setResultLoadState('loading');
+    fetchAssessmentResult()
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+        if (response === null) {
+          setResultLoadState('notReady');
+          return;
+        }
+        setResult(response);
+        setResultLoadState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResultLoadState('error');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [submitted]);
 
   const dimensions = useMemo(
     () => (data ? [...data.dimensions].sort((a, b) => a.displayOrder - b.displayOrder) : []),
@@ -200,6 +236,52 @@ export function AssessmentSelfScreen(): JSX.Element {
           <h2 className="assessment-submitted-title">{strings.assessment.submittedTitle}</h2>
           <p className="assessment-submitted-body">{strings.assessment.submittedBody}</p>
         </div>
+      )}
+
+      {loadState === 'ready' && submitted && resultLoadState === 'loading' && (
+        <p className="assessment-status">{strings.result.loading}</p>
+      )}
+
+      {loadState === 'ready' && submitted && resultLoadState === 'error' && (
+        <p className="assessment-status assessment-status-error" role="alert">
+          {strings.assessment.loadError}
+        </p>
+      )}
+
+      {loadState === 'ready' && submitted && resultLoadState === 'ready' && result && (
+        <section className="assessment-result">
+          <h2 className="assessment-result-title">{strings.result.sectionTitle}</h2>
+          <p className="assessment-result-intro">{strings.result.intro}</p>
+
+          {[...result.dimensions]
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map((dimension) => (
+              <div className="assessment-result-row" key={dimension.dimensionId}>
+                <h3 className="assessment-result-dimension-name">{dimension.name}</h3>
+                <div className="assessment-result-scores">
+                  <span className="assessment-result-score">
+                    <span className="assessment-result-score-label">{strings.result.selfLabel}</span>
+                    <span className={`level-badge level-badge-${dimension.selfScore}`}>
+                      {strings.assessment.levelAbbrev(dimension.selfScore)}
+                    </span>
+                  </span>
+                  <span className="assessment-result-score">
+                    <span className="assessment-result-score-label">{strings.result.managerLabel}</span>
+                    <span className={`level-badge level-badge-${dimension.managerScore}`}>
+                      {strings.assessment.levelAbbrev(dimension.managerScore)}
+                    </span>
+                  </span>
+                  <DivergenceFlag selfScore={dimension.selfScore} managerScore={dimension.managerScore} />
+                </div>
+                <p className="assessment-result-comment">
+                  <span className="assessment-result-comment-label">{strings.result.commentLabel}</span>
+                  <span className="assessment-result-comment-text">
+                    {dimension.managerComment ?? strings.result.noComment}
+                  </span>
+                </p>
+              </div>
+            ))}
+        </section>
       )}
 
       {loadState === 'ready' && !submitted && (

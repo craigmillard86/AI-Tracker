@@ -17,6 +17,44 @@ public interface IAssessmentStore
     /// decision (never called directly by an endpoint).</summary>
     Task<IReadOnlyList<AssessmentScore>> GetIndividualScoresAsync(
         Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default);
+
+    /// <summary>A subject's assessment (with its per-dimension scores) for a cycle — the cross-person
+    /// moderation-view read (HAP-9). Invoked by <see cref="ManagerModerationService"/> AFTER the caller
+    /// has been authorised for the subject; null when the subject has no assessment row this cycle.</summary>
+    Task<AssessmentWithScores?> GetAssessmentWithScoresAsync(
+        Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default);
+
+    /// <summary>The assessment (with scores) addressed by <paramref name="assessmentId"/> — the
+    /// moderation write resolves the subject/cycle/state from the assessment id in the route. Null when
+    /// no such assessment exists. Authorisation happens at the service AFTER this resolves the subject.</summary>
+    Task<AssessmentWithScores?> GetByIdWithScoresAsync(
+        Guid assessmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>The assessment rows for a set of people in a cycle (the manager's review queue —
+    /// state per report). No scores are returned (the queue shows state + flags only, no score data);
+    /// people with no assessment row this cycle are simply absent from the result.</summary>
+    Task<IReadOnlyList<Assessment>> GetAssessmentsForPeopleAsync(
+        Guid cycleId, IReadOnlyCollection<Guid> personIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Applies a manager's moderation to the assessment (HAP-9; FR-008/009/010). Atomic: every
+    /// per-dimension manager score/comment (<paramref name="decisions"/>), the
+    /// <c>Submitted → Moderated</c> transition (recording <paramref name="moderatedByPersonId"/>), and the
+    /// staged <paramref name="auditRow"/> (the FR-050 <c>ScoreChange</c> record) commit together, or none
+    /// do — an audit-write failure rolls the whole moderation back (fail-closed, mirrors
+    /// <c>OrgOverrideService</c>). Throws <see cref="AssessmentNotFoundException"/> (→404) if the id is
+    /// unknown, <see cref="AssessmentStateException"/> (→409) if it is not currently Submitted (checked
+    /// BEFORE any score write so a wrong-state moderation never partially applies),
+    /// <see cref="ModerationDimensionException"/> (→422) for a decision naming a dimension the assessment
+    /// has no score row for, and the domain's <see cref="ManagerCommentRequiredException"/>/
+    /// <see cref="ScoreOutOfRangeException"/> (→422) from <see cref="AssessmentScore.SetManager"/>.
+    /// </summary>
+    Task ModerateAsync(
+        Guid assessmentId,
+        Guid moderatedByPersonId,
+        IReadOnlyList<ManagerScoreInput> decisions,
+        Hap.Domain.Audit.AuditLog auditRow,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -56,6 +94,65 @@ public sealed record AssessmentWithScores(Assessment Assessment, IReadOnlyList<A
 
 /// <summary>One dimension's self input on an upsert: the dimension, the 0–3 level, optional evidence.</summary>
 public sealed record SelfScoreInput(Guid DimensionId, int Score, string? Evidence);
+
+/// <summary>One dimension's manager decision on a moderation: the dimension, the 0–3 moderated score,
+/// and an optional comment (mandatory in the domain when |self − manager| ≥ 2, FR-009).</summary>
+public sealed record ManagerScoreInput(Guid DimensionId, int Score, string? Comment);
+
+/// <summary>The assessment addressed by a moderation write does not exist (API 404). Distinct from the
+/// authorisation denial (also 404, existence-leak convention) so the two paths read clearly in code.</summary>
+public sealed class AssessmentNotFoundException : Exception
+{
+    public AssessmentNotFoundException(Guid assessmentId)
+        : base($"Assessment {assessmentId} does not exist.")
+    {
+    }
+}
+
+/// <summary>A moderation decision named a dimension the assessment has no score row for — an unknown or
+/// foreign-framework dimension (API 422). Caught before the transaction commits, so no partial
+/// moderation persists.</summary>
+public sealed class ModerationDimensionException : Exception
+{
+    public ModerationDimensionException(Guid dimensionId)
+        : base($"Dimension {dimensionId} is not part of this assessment — it has no self score to moderate.")
+    {
+    }
+}
+
+/// <summary>A moderation was attempted against an assessment that is not currently Submitted — nothing to
+/// moderate, or already moderated/auto-adopted (API 409). The seam re-surfaces the domain's forward-only
+/// state exception as its own type so the endpoint never references the domain assessment namespace (the
+/// boundary guard forbids naming it outside the seam).</summary>
+public sealed class ModerationNotSubmittedException : Exception
+{
+    public ModerationNotSubmittedException(Guid assessmentId)
+        : base($"Assessment {assessmentId} is not awaiting moderation (it must be Submitted).")
+    {
+    }
+}
+
+/// <summary>A moderation decision was invalid (API 422): a divergence of ≥2 without a comment (FR-009),
+/// or a manager score outside 0–3. The seam re-surfaces the domain's validation exceptions as its own
+/// type — same reason as <see cref="ModerationNotSubmittedException"/> — carrying the domain message.</summary>
+public sealed class ModerationValidationException : Exception
+{
+    public ModerationValidationException(string message)
+        : base(message)
+    {
+    }
+}
+
+/// <summary>A moderation lost an optimistic-concurrency race — another moderation of the same assessment
+/// committed first (the assessment's <c>xmin</c> concurrency token moved). API 409. Distinct from
+/// <see cref="ModerationNotSubmittedException"/> only for diagnostics; both are 409 conflicts.</summary>
+public sealed class ModerationConflictException : Exception
+{
+    public ModerationConflictException(Guid assessmentId)
+        : base($"Assessment {assessmentId} was moderated concurrently — retry against the current state.")
+    {
+    }
+}
 
 /// <summary>Attempted to write to or re-submit an assessment that is already
 /// <see cref="AssessmentState.Submitted"/> (API 409).</summary>

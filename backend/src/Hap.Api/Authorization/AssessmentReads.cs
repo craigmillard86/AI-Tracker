@@ -61,8 +61,11 @@ public sealed class AssessmentAccessDeniedException : Exception
 /// when the caller is the subject's DIRECT manager (spec: "Manager sees direct reports"), or holds an
 /// explicit BU-scope grant (<see cref="OrgRole.BuDelegate"/>) covering the subject's BU. A transitive
 /// (skip-level / BU-wide) read by a caller we cannot structurally attribute to a within-BU role FAILS
-/// CLOSED — denied — pending Q-014/Q-015. This is a hard G1 precondition (see QUESTIONS.md Q-015): HAP-8
-/// MUST NOT wire a live individual-read endpoint until the BU-tier cap lands.</para>
+/// CLOSED — denied. The one-hop direct read (incl. an above-BU hierarchy leader reading their own direct
+/// report) is <b>ratified per <see href="../../../docs/decisions/DR-0005-above-bu-direct-report-read.md">DR-0005</see></b>
+/// (Q-015, owner-ratified ALLOW); the broad transitive cap remains deferred to Q-014. Because DR-0005
+/// lifted the HAP-8 precondition, a live cross-person read endpoint is now wired on top of this gateway
+/// (HAP-9 <c>GET /api/team/members/{id}/assessment</c>), which enforces exactly the ratified policy.</para>
 /// </summary>
 public sealed class AssessmentReads
 {
@@ -113,14 +116,18 @@ public sealed class AssessmentReads
 
         return reach switch
         {
-            // Manager: DIRECT reports only. The chain grant re-confirms the reader is the active,
-            // non-excluded direct manager. A transitive/skip-level read is the BU-tier capability we
-            // cannot attribute without Q-014 → fail closed.
+            // Manager: the caller must be the subject's REVIEWER OF RECORD — the first active,
+            // non-excluded manager up the chain. Normally that is the literal direct manager; where the
+            // direct manager is a contractor (DR-0006) or departed/inactive (FR-070), responsibility
+            // escalates to the first employee ancestor, who is the effective line manager and may read
+            // (and moderate) the report. A transitive/skip-level read past a VALID employee manager is
+            // NOT the reviewer of record → fail closed (broad BU-tier cap deferred to Q-014; one-hop
+            // direct read ratified per DR-0005).
             IndividualReadReach.DirectReports =>
-                isDirectManager && _chain.GrantsIndividualRead(graph, caller.PersonId, subjectPersonId)
+                _chain.ReviewerOfRecord(graph, subjectPersonId) == caller.PersonId
                     ? ReadDecision.Allow
                     : ReadDecision.Deny(
-                        "transitive (non-direct-report) individual read requires a BU-scope grant — fail closed pending Q-014 (Q-015)"),
+                        "only the subject's reviewer of record (first active, non-excluded manager, escalated past a contractor/departed direct manager per DR-0006/FR-070) reads as a manager — transitive/skip-level reads fail closed (Q-014)"),
 
             // BU delegate: a direct report in any BU (the chain rule governs across BU boundaries), OR
             // any subject homed in the explicitly-delegated BU.
@@ -148,6 +155,56 @@ public sealed class AssessmentReads
             throw new AssessmentAccessDeniedException(caller.PersonId, subjectPersonId, decision.Reason);
         }
         return await _store.GetIndividualScoresAsync(subjectPersonId, cycleId, cancellationToken);
+    }
+
+    /// <summary>
+    /// The access decision for MODERATING a subject's assessment (HAP-9; FR-008/010). <b>Moderation ⊆
+    /// read</b>: the caller must BOTH be able to read the subject's individual scores at all
+    /// (<see cref="AuthorizeIndividualRead"/> — role capability + reach + reader eligibility) AND be the
+    /// subject's REVIEWER OF RECORD — the first active, non-excluded manager up the chain
+    /// (<see cref="ChainResolver.ReviewerOfRecord"/>): normally the literal direct manager, but escalated
+    /// past a contractor (DR-0006) or departed/inactive (FR-070) one to the first employee ancestor.
+    ///
+    /// <para><b>The read gate is load-bearing, not decorative (L3 red-team).</b> Without it, a caller who
+    /// is a chain ancestor but has NO individual-read capability — e.g. a HIG Executive who is the
+    /// reviewer of record of a Portfolio Leader (FR-025 clause 2) — could reach the FR-009 forced-comment
+    /// path, whose error text would then leak the subject's exact self-score as a probing oracle. Gating
+    /// moderation on the same read decision closes that: a role denied the read is denied moderation.</para>
+    ///
+    /// <para>A BU delegate can READ BU-wide but only MODERATES their own reviewee-of-record (the second
+    /// conjunct binds); the subject may not moderate themselves. Pure and side-effect-free — the endpoint
+    /// funnels through here exactly as reads funnel through <see cref="AuthorizeIndividualRead"/>. A denied
+    /// moderation surfaces as a 404 (existence-leak) with NO audit row, identical to a denied read.</para>
+    /// </summary>
+    public ReadDecision AuthorizeModeration(OrgGraph graph, CallerContext caller, Guid subjectPersonId)
+    {
+        if (caller.PersonId == subjectPersonId)
+        {
+            return ReadDecision.Deny("a person cannot moderate their own assessment");
+        }
+
+        var subject = graph.Find(subjectPersonId);
+        if (subject is null)
+        {
+            return ReadDecision.Deny("subject is not in the org graph");
+        }
+
+        // Conjunct 1 — the caller must be able to READ the subject at all (capability + reach + reader
+        // eligibility). This is what denies a capability-less chain ancestor (Exec/Group/Admin) and closes
+        // the score-oracle leak. Fail closed with the read reason.
+        var readDecision = AuthorizeIndividualRead(graph, caller, subjectPersonId);
+        if (!readDecision.Allowed)
+        {
+            return readDecision;
+        }
+
+        // Conjunct 2 — and be the reviewer of record. Escalates past a contractor (DR-0006)/departed
+        // (FR-070) direct manager to the first employee ancestor; denies the contractor itself, a
+        // skip-level manager above the reviewer of record, and a BU delegate who is not the reviewer.
+        return _chain.ReviewerOfRecord(graph, subjectPersonId) == caller.PersonId
+            ? ReadDecision.Allow
+            : ReadDecision.Deny(
+                "only the subject's reviewer of record (first active, non-excluded manager, escalated past a contractor/departed direct manager per DR-0006/FR-070) may moderate");
     }
 
     /// <summary>

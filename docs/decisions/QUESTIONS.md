@@ -413,3 +413,93 @@ belongs here rather than a dedicated future story, and (b-elevation) the audit-r
 assigned to the future Wave-2 story that first reconciles the flag, not retrofitted here.
 **Status:** OPEN (provisional answers in effect; HAP-7 proceeds on all three; (a-addendum) and (b-elevation)
 are forward obligations on HAP-10 and a future Wave-2 story respectively)
+
+## 2026-07-22 · HAP-9 (manager moderation) · Q-018 — Is a manager's moderation write itself audited (ScoreChange), or only the read (IndividualView)?
+
+The story's binding audit requirement is the `[A]` read: `GET /api/team/members/{id}/assessment` writes exactly one
+`IndividualView` `AuditLog` row (fail-closed). contracts/api.md's "Contract tests (minimum)" lists only the
+`IndividualView` audit assertion; `PUT /api/team/reviews/{id}` (the moderation write) is **not** marked `[A]` and no
+acceptance criterion mentions auditing it. But **FR-050** enumerates "score changes" as a MUST-audit action, and the
+moderation write produces the moderated score of record (FR-010) — the single most reporting-consequential score
+change in the system. HAP-8 set a precedent of NOT auditing *self* score writes ("viewing your own data is not
+audited"), but that is a caller==subject case; moderation is a manager writing another person's score of record.
+
+**Provisional answer in effect (per CLAUDE.md §6.3; uncertainty rounds up on the safeguarding seam):** a successful
+moderation write stages exactly one `ScoreChange` `AuditLog` row (actor = moderating manager, subject = the report,
+detail = assessmentId/cycleId + count of dimensions moderated), on the same context/transaction as the score writes
+and the `Submitted → Moderated` transition, so an audit-write failure rolls the whole moderation back (fail-closed),
+mirroring `OrgOverrideService`. This is additive to the mandatory `IndividualView` row on the member-assessment GET
+and does not affect that endpoint's exactly-one-row count (different action, different endpoint). Self score writes
+stay unaudited (HAP-8 precedent).
+
+**Blocks:** nothing — a reversal (contract's IndividualView-only minimum is intended) is a trivial removal of one
+staged row + its test. **Owner/panel action:** confirm the moderation write should be `ScoreChange`-audited, or ratify
+the contract's IndividualView-only minimum.
+**Status:** **RESOLVED 2026-07-22 — KEEP (HAP-9 L3 panel, domain specialist = spec authority).** FR-050 explicitly
+names "score changes" as a MUST-audit action, distinct from HAP-8's caller==subject self-write exemption; the
+moderation write produces the score of record, so it MUST be audited. Keep the single `ScoreChange` row, atomic +
+fail-closed with the score writes and the state transition (red-team confirmed the transaction is atomic). Additive
+to the mandatory `IndividualView` row on the member GET.
+
+## 2026-07-22 · HAP-9 (manager moderation) · Q-019 — Does FR-063 carry-forward also carry the prior cycle's moderation COMMENT?
+
+FR-063 defaults manager review to carrying the prior cycle's moderated score forward when the self-score is unchanged.
+When that prior moderated score diverged ≥2 from the self-score (a sustained Δ≥2 moderation), the carried-forward
+DEFAULT is itself a Δ≥2 decision — which FR-009 says requires a manager comment. The prior cycle's comment exists, but
+carrying it forward silently would let a sustained Δ≥2 be re-accepted with no fresh manager attention each cycle
+(defeating the point of the comment requirement), while NOT carrying it forces a fresh comment every cycle even when
+nothing changed.
+
+**Provisional answer in effect (per CLAUDE.md §6.3; strict FR-009):** carry the prior *score* forward but NOT the
+prior *comment* — each cycle's Δ≥2 moderation must capture a fresh comment. The member-read payload flags this per
+dimension (`defaultCommentRequired`), so the client pre-empts the forced-comment state on the DEFAULT and an
+"accept all defaults" PUT with no comment is rejected 422 exactly as an edited Δ≥2 is (GET and PUT agree). This is what
+the shipped fix implements, so no behaviour hangs on the answer — a "carry the comment too" ruling would be an additive
+relaxation (pre-fill the prior comment as the default), not a rework.
+
+**Blocks:** nothing. **Owner action:** confirm fresh-comment-each-cycle, or rule that a sustained-unchanged Δ≥2 may
+carry the prior comment as its default.
+**Status:** OPEN (provisional answer in effect; HAP-9 ships the strict-FR-009 reading)
+
+## 2026-07-22 · HAP-9 (manager moderation) · Q-020 — Who moderates a senior leader whose reviewer-of-record has no individual-read capability?
+
+The HAP-9 L3 red-team found (and the fix now enforces) that **moderation ⊆ read**: a caller who cannot READ a subject's
+individual scores cannot moderate them. This is correct and closes a score-oracle leak. But it exposes a real gap in the
+assessment *model*: a senior leader's reviewer-of-record is often a role FR-025 clause 2 caps at aggregates-only — e.g. a
+Portfolio Leader's direct manager is the HIG Executive, who has NO individual-read capability. Under the fix, the Exec
+(correctly) cannot moderate the Portfolio Leader — and neither can anyone else (a skip-level manager above the reviewer
+of record is also denied, and there is no other reviewer). So **a senior leader whose reviewer-of-record lacks read
+capability goes un-moderated.**
+
+**Provisional answer in effect (per CLAUDE.md §6.3; fails closed):** such assessments are simply not manager-moderated;
+at cycle close they **auto-adopt the self-score** as the moderated score of record, flagged `unmoderated` (the existing
+FR-068 mechanism, HAP-10) — no new moderation path is invented, and no access rule is relaxed. The security fix (moderation
+⊆ read) stands **regardless** of how this is ruled. Possible owner rulings: (a) accept auto-adoption for these few
+top-of-tree roles; (b) designate an explicit moderator via a `BuDelegate`-style grant or a dedicated senior-review role;
+(c) rule that above-BU leaders self-attest without moderation. Each is additive (a grant/role or a policy note), not a
+change to the seam's read rule.
+
+**Blocks:** nothing locally. **This is an assessment-model gap the owner must rule on** (flagged prominently in the HAP-9
+story notes). **Owner action:** decide how senior leaders (whose reviewer-of-record is aggregates-only) get moderated,
+or ratify auto-adoption for them.
+**Status:** OPEN (provisional answer in effect; the security fix is independent of the ruling)
+
+### Q-020 addendum (a) — 2026-07-22, HAP-9 re-panel (domain, scope boundary)
+
+The moderation⊆read denial of an explicit-grant leader **extends DR-0005, it does not contradict it.** DR-0005 ratified a
+one-hop direct read+moderate "regardless of the manager's tier" — but that ruling is about a **grant-LESS hierarchy**
+Group/Portfolio Leader, who classifies as a plain `Manager` via `ClassifyReader`'s `HasDirectReports` fallback and keeps
+their one-hop grant. An **explicit-grant** holder (HIG Executive / Platform Admin / Group-Viewer) is classified by their
+grant FIRST — they never reach the `HasDirectReports` branch — and `RoleScope.IndividualReadCapability` returns false for
+them by construction (FR-025 clause 2). So the two rulings partition cleanly: DR-0005 governs the hierarchy-tier reader;
+Q-020 governs the explicit-grant reader. No conflict.
+
+### Q-020 addendum (b) — 2026-07-22, HAP-9 re-panel (code, BU-delegate escalation edge — fold into this ruling)
+
+A related edge the same owner ruling should cover (pre-dates the batch-3 fix; fails closed, so not patched now): a
+**BU-delegate** who becomes the ESCALATED reviewer-of-record of a subject homed OUTSIDE their delegated BU (e.g. the
+subject's contractor manager is skipped and the delegate is the next eligible ancestor across a BU boundary) is **denied
+moderation** — `AuthorizeIndividualRead`'s BusinessUnit reach requires the subject be homed in the delegated BU (or a
+direct report), so the read conjunct fails and, with it, moderation. This is a safe under-grant (fails closed), and it is
+the same shape of "who moderates when the natural reviewer can't" question as the senior-leader gap above, so it rides
+the same Q-020 owner ruling rather than a separate fix.

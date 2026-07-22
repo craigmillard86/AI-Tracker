@@ -26,6 +26,25 @@ public sealed class AssessmentReadsGatewayTests
             return Task.FromResult<IReadOnlyList<AssessmentScore>>(
                 new[] { AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), 2, null) });
         }
+
+        // These gateway tests only reach the store via GetIndividualScoresAsync (counted above); the
+        // moderation-path members are never exercised here and must fail loudly if reached.
+        public Task<AssessmentWithScores?> GetAssessmentWithScoresAsync(
+            Guid subjectPersonId, Guid cycleId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AssessmentWithScores?> GetByIdWithScoresAsync(
+            Guid assessmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Assessment>> GetAssessmentsForPeopleAsync(
+            Guid cycleId, IReadOnlyCollection<Guid> personIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task ModerateAsync(
+            Guid assessmentId, Guid moderatedByPersonId, IReadOnlyList<ManagerScoreInput> decisions,
+            Hap.Domain.Audit.AuditLog auditRow, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     // evp → mgr → ind ; stranger under evp ; ctr (contractor) under evp → ctr_report ; xbu (BU2) under evp
@@ -216,5 +235,110 @@ public sealed class AssessmentReadsGatewayTests
         Assert.Equal(SeamRole.BuLead, AssessmentReads.ClassifyReader(WithGrant(b.Id("evp"), OrgRole.BuDelegate, b.Id("BU1")), g).Role);
         Assert.Equal(SeamRole.Manager, AssessmentReads.ClassifyReader(Ungranted(b.Id("mgr")), g).Role);   // has a report
         Assert.Equal(SeamRole.Individual, AssessmentReads.ClassifyReader(Ungranted(b.Id("ind")), g).Role); // no reports
+    }
+
+    // === AuthorizeModeration (HAP-9) — moderation is the DIRECT manager's grant only ================
+    // Stricter than a read: a BU delegate can READ BU-wide but may NOT moderate; the subject may not
+    // moderate themselves; a contractor direct manager is excluded (Q-006 / DR-0006).
+
+    [Fact]
+    public void Moderation_is_allowed_for_the_direct_manager_only()
+    {
+        var (g, b) = Org();
+        var gateway = Gateway(new CountingStore());
+
+        // mgr is ind's direct manager → allowed. evp is ind's transitive ancestor (not direct) → denied.
+        Assert.True(gateway.AuthorizeModeration(g, Ungranted(b.Id("mgr")), b.Id("ind")).Allowed);
+        Assert.False(gateway.AuthorizeModeration(g, Ungranted(b.Id("evp")), b.Id("ind")).Allowed);
+        // evp IS mgr's direct manager → allowed to moderate mgr.
+        Assert.True(gateway.AuthorizeModeration(g, Ungranted(b.Id("evp")), b.Id("mgr")).Allowed);
+    }
+
+    [Fact]
+    public void Moderation_of_a_direct_report_across_a_BU_boundary_is_allowed()
+    {
+        var (g, b) = Org();
+        // evp directly manages xbu (homed in BU2) — the chain rule governs regardless of BU.
+        Assert.True(Gateway(new CountingStore()).AuthorizeModeration(g, Ungranted(b.Id("evp")), b.Id("xbu")).Allowed);
+    }
+
+    [Fact]
+    public void Nobody_can_moderate_their_own_assessment()
+    {
+        var (g, b) = Org();
+        Assert.False(Gateway(new CountingStore()).AuthorizeModeration(g, Ungranted(b.Id("ind")), b.Id("ind")).Allowed);
+    }
+
+    [Fact]
+    public void A_contractor_direct_manager_may_not_moderate_their_report()
+    {
+        var (g, b) = Org();
+        // ctr is ctr_report's direct manager but a contractor → excluded from individual access, so also
+        // from moderation (the review escalates to the first employee ancestor, ChainResolver).
+        Assert.False(Gateway(new CountingStore()).AuthorizeModeration(g, Ungranted(b.Id("ctr")), b.Id("ctr_report")).Allowed);
+    }
+
+    [Fact]
+    public void A_BU_delegate_who_is_not_the_direct_manager_may_read_but_not_moderate()
+    {
+        var (g, b) = Org();
+        var gateway = Gateway(new CountingStore());
+        var evpDelegate = WithGrant(b.Id("evp"), OrgRole.BuDelegate, b.Id("BU1"));
+
+        // The BU delegate CAN read ind BU-wide (established above)…
+        Assert.True(gateway.AuthorizeIndividualRead(g, evpDelegate, b.Id("ind")).Allowed);
+        // …but may NOT moderate ind — moderation follows line management, not the BU-scope grant.
+        Assert.False(gateway.AuthorizeModeration(g, evpDelegate, b.Id("ind")).Allowed);
+    }
+
+    [Fact]
+    public void A_person_with_no_reports_cannot_moderate_anyone()
+    {
+        var (g, b) = Org();
+        Assert.False(Gateway(new CountingStore()).AuthorizeModeration(g, Ungranted(b.Id("stranger")), b.Id("ind")).Allowed);
+    }
+
+    // --- DR-0006: read + moderation escalate past a contractor direct manager -----------------------
+
+    [Fact]
+    public void Read_and_moderation_escalate_past_a_contractor_direct_manager_to_the_employee_ancestor()
+    {
+        var (g, b) = Org();
+        var gateway = Gateway(new CountingStore());
+
+        // ctr_report's direct manager is the contractor ctr; its reviewer of record is the employee evp.
+        // The contractor gets nothing; the escalated employee ancestor may READ and MODERATE.
+        Assert.False(gateway.AuthorizeModeration(g, Ungranted(b.Id("ctr")), b.Id("ctr_report")).Allowed);
+        Assert.True(gateway.AuthorizeModeration(g, Ungranted(b.Id("evp")), b.Id("ctr_report")).Allowed);
+        Assert.True(gateway.AuthorizeIndividualRead(g, Ungranted(b.Id("evp")), b.Id("ctr_report")).Allowed);
+
+        // The escalation does NOT open a skip-level read past a VALID employee manager: evp still cannot
+        // read/moderate ind (whose reviewer of record is the employee mgr, not evp).
+        Assert.False(gateway.AuthorizeModeration(g, Ungranted(b.Id("evp")), b.Id("ind")).Allowed);
+        Assert.False(gateway.AuthorizeIndividualRead(g, Ungranted(b.Id("evp")), b.Id("ind")).Allowed);
+    }
+
+    // --- L3: moderation ⊆ read — a capability-less reviewer of record is denied (score oracle) ------
+
+    [Fact]
+    public void Moderation_is_denied_for_a_reviewer_of_record_who_has_no_individual_read_capability()
+    {
+        var (g, b) = Org();
+        var gateway = Gateway(new CountingStore());
+
+        // evp is mgr's DIRECT manager (mgr's reviewer of record). As an UNGRANTED manager, evp legitimately
+        // moderates mgr…
+        Assert.True(gateway.AuthorizeModeration(g, Ungranted(b.Id("evp")), b.Id("mgr")).Allowed);
+
+        // …but the SAME person holding a HIG Executive grant has no individual-read capability (FR-025
+        // clause 2), so — even as the reviewer of record — they are denied BOTH the read AND moderation.
+        // Without the moderation⊆read gate this returned Allowed and the FR-009 error leaked mgr's score.
+        var exec = WithGrant(b.Id("evp"), OrgRole.HigExecutive);
+        Assert.False(gateway.AuthorizeIndividualRead(g, exec, b.Id("mgr")).Allowed);
+        Assert.False(gateway.AuthorizeModeration(g, exec, b.Id("mgr")).Allowed);
+
+        // Same for a Platform Admin grant and a Group Viewer grant (both aggregates-only).
+        Assert.False(gateway.AuthorizeModeration(g, WithGrant(b.Id("evp"), OrgRole.PlatformAdmin), b.Id("mgr")).Allowed);
+        Assert.False(gateway.AuthorizeModeration(g, WithGrant(b.Id("evp"), OrgRole.GroupViewer), b.Id("mgr")).Allowed);
     }
 }

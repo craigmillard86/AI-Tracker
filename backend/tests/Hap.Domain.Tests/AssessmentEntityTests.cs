@@ -91,4 +91,97 @@ public class AssessmentEntityTests
 
         Assert.Throws<ScoreOutOfRangeException>(() => row.SetSelf(9, null));
     }
+
+    // --- HAP-9: moderation state transition -------------------------------------------------------
+
+    [Fact]
+    public void Moderate_transitions_Submitted_to_Moderated_and_records_moderator_and_instant()
+    {
+        var assessment = Assessment.Start(Guid.NewGuid(), Guid.NewGuid());
+        assessment.Submit();
+        var moderator = Guid.NewGuid();
+
+        assessment.Moderate(moderator);
+
+        Assert.Equal(AssessmentState.Moderated, assessment.State);
+        Assert.Equal(moderator, assessment.ModeratedByPersonId);
+        Assert.NotNull(assessment.ModeratedAt);
+    }
+
+    [Fact]
+    public void Moderate_before_submit_throws_the_forward_only_state_exception()
+    {
+        var assessment = Assessment.Start(Guid.NewGuid(), Guid.NewGuid()); // still InProgress
+
+        var ex = Assert.Throws<AssessmentStateException>(() => assessment.Moderate(Guid.NewGuid()));
+        Assert.Equal(AssessmentState.InProgress, ex.From);
+        Assert.Equal(AssessmentState.Moderated, ex.To);
+    }
+
+    [Fact]
+    public void Moderate_twice_throws_a_report_cannot_be_re_moderated()
+    {
+        var assessment = Assessment.Start(Guid.NewGuid(), Guid.NewGuid());
+        assessment.Submit();
+        assessment.Moderate(Guid.NewGuid());
+
+        var ex = Assert.Throws<AssessmentStateException>(() => assessment.Moderate(Guid.NewGuid()));
+        Assert.Equal(AssessmentState.Moderated, ex.From);
+    }
+
+    // --- HAP-9: manager scoring + the FR-009 comment-at-Δ≥2 invariant -----------------------------
+
+    [Theory]
+    [InlineData(2, 2)] // Δ0
+    [InlineData(2, 1)] // Δ1
+    [InlineData(2, 3)] // Δ1
+    public void SetManager_below_the_divergence_threshold_needs_no_comment(int self, int manager)
+    {
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), self, null);
+
+        row.SetManager(manager, null); // no throw
+
+        Assert.Equal(manager, row.ManagerScore);
+        Assert.Equal(self, row.SelfScore); // self retained for the calibration delta (FR-011)
+        Assert.Equal(Math.Abs(self - manager), row.Divergence);
+    }
+
+    [Theory]
+    [InlineData(3, 1)] // Δ2
+    [InlineData(0, 3)] // Δ3
+    public void SetManager_at_or_above_the_divergence_threshold_requires_a_comment(int self, int manager)
+    {
+        var dimensionId = Guid.NewGuid();
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), dimensionId, self, null);
+
+        var ex = Assert.Throws<ManagerCommentRequiredException>(() => row.SetManager(manager, null));
+        Assert.Equal(dimensionId, ex.DimensionId);
+        Assert.Null(row.ManagerScore); // nothing applied on rejection
+
+        // A whitespace-only comment does not satisfy the requirement either.
+        Assert.Throws<ManagerCommentRequiredException>(() => row.SetManager(manager, "   "));
+
+        // With a real comment the diverging moderation is accepted.
+        row.SetManager(manager, "evidence shows a lower level");
+        Assert.Equal(manager, row.ManagerScore);
+        Assert.Equal("evidence shows a lower level", row.ManagerComment);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(4)]
+    public void SetManager_rejects_an_out_of_range_score(int managerScore)
+    {
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), 2, null);
+
+        Assert.Throws<ScoreOutOfRangeException>(() => row.SetManager(managerScore, "comment"));
+    }
+
+    [Fact]
+    public void Divergence_is_null_until_a_manager_score_is_set()
+    {
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), 2, null);
+
+        Assert.Null(row.Divergence);
+    }
 }

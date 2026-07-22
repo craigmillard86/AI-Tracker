@@ -29,6 +29,15 @@ public sealed class AssessmentConfiguration : IEntityTypeConfiguration<Assessmen
         e.Property(x => x.Unmoderated).IsRequired();
         e.Property(x => x.CreatedAt).IsRequired();
 
+        // Optimistic concurrency on the score-of-record (HAP-9, code-reviewer SHOULD-FIX C). Maps
+        // Postgres's built-in `xmin` system column as an EF row-version concurrency token (the current
+        // replacement for the obsolete UseXminAsConcurrencyToken) — so two racing moderations (or submit
+        // + moderation) of the same assessment cannot both commit last-write-wins; the loser's UPDATE
+        // matches zero rows and EF raises DbUpdateConcurrencyException, which the seam maps to a 409.
+        // Npgsql maps a `uint` property named `xmin` to the always-present system column, so this needs
+        // NO migration and adds no DDL (the shadow property is excluded from the model's table columns).
+        e.Property<uint>("xmin").IsRowVersion();
+
         // One assessment per person per cycle (data-model.md invariant) — enforced at the DB.
         e.HasIndex(x => new { x.CycleId, x.PersonId }).IsUnique();
         e.HasIndex(x => x.PersonId);

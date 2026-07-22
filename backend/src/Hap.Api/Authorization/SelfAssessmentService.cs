@@ -131,40 +131,60 @@ public sealed class SelfAssessmentService
         await _store.SubmitSelfAsync(personId, cycle.Id, requiredDimensionIds, ct);
     }
 
-    // The cycle a self-assessment currently acts on: the single Open cycle if one exists (FR-002: one
-    // Open per framework; this build is single-framework), otherwise the most-recently-opened Closed
-    // cycle — the post-close late-override window (Q-017a). A write against a Closed cycle is then gated
-    // by the submission lock (EnsureSubmissionAllowedAsync), which rejects it unless an override exists.
-    // Draft cycles are never "current" (nothing to assess yet).
-    private async Task<Cycle> CurrentCycleAsync(CancellationToken ct)
+    /// <summary>The caller's OWN moderated result for the current cycle (contracts/api.md GET
+    /// /api/me/assessment/result; FR-012): per-dimension self + moderated (manager) scores, the manager
+    /// comment, and the divergence highlight. Self-scope (caller == subject), so this is not audited and
+    /// exposes no cross-person surface. Returns null — mapped to 404 by the endpoint — until the
+    /// assessment is Moderated or AutoAdopted (FR-068): before manager review completes there is no result
+    /// of record to show.</summary>
+    public async Task<SelfAssessmentResultView?> GetResultAsync(Guid personId, CancellationToken ct = default)
     {
-        var open = await _db.Cycles
-            .Where(c => c.State == CycleState.Open)
-            .OrderByDescending(c => c.OpensAt)
-            .FirstOrDefaultAsync(ct);
-        if (open is not null)
+        var cycle = await CurrentCycleAsync(ct);
+        var current = await _store.GetSelfAsync(personId, cycle.Id, ct);
+        if (current is null
+            || current.Assessment.State is not (AssessmentState.Moderated or AssessmentState.AutoAdopted))
         {
-            return open;
+            return null; // no result before moderation / auto-adoption (FR-012)
         }
 
-        var mostRecentClosed = await _db.Cycles
-            .Where(c => c.State == CycleState.Closed)
-            .OrderByDescending(c => c.OpensAt)
-            .FirstOrDefaultAsync(ct);
-        return mostRecentClosed ?? throw new NoCurrentCycleException();
+        var dimensions = await DimensionsAsync(cycle.FrameworkVersionId, ct);
+        var byDim = current.Scores.ToDictionary(s => s.DimensionId);
+
+        var dimensionViews = dimensions
+            .Where(d => byDim.ContainsKey(d.Id))
+            .Select(d =>
+            {
+                var score = byDim[d.Id];
+                // Moderated: manager score is set. AutoAdopted (FR-068, HAP-10): the self-score was copied
+                // to the manager score at close — fall back to the self-score defensively either way.
+                var managerScore = score.ManagerScore ?? score.SelfScore;
+                return new SelfResultDimensionView(
+                    DimensionId: d.Id,
+                    Key: d.Key,
+                    Name: d.Name,
+                    DisplayOrder: d.DisplayOrder,
+                    Levels: d.Levels,
+                    SelfScore: score.SelfScore,
+                    ManagerScore: managerScore,
+                    ManagerComment: score.ManagerComment,
+                    Divergence: Math.Abs(score.SelfScore - managerScore));
+            })
+            .ToList();
+
+        return new SelfAssessmentResultView(
+            CycleId: cycle.Id,
+            CycleName: cycle.Name,
+            State: current.Assessment.State.ToString(),
+            ModeratedAt: current.Assessment.ModeratedAt,
+            Dimensions: dimensionViews);
     }
 
-    // The immediately-preceding cycle for the same framework version (FR-062 "previous cycle"). Draft
-    // cycles never held scores, so they are excluded.
-    private async Task<Guid?> PriorCycleIdAsync(Cycle current, CancellationToken ct) =>
-        await _db.Cycles
-            .Where(c => c.FrameworkVersionId == current.FrameworkVersionId
-                        && c.Id != current.Id
-                        && c.State != CycleState.Draft
-                        && c.OpensAt < current.OpensAt)
-            .OrderByDescending(c => c.OpensAt)
-            .Select(c => (Guid?)c.Id)
-            .FirstOrDefaultAsync(ct);
+    // Cycle resolution ("which cycle is current", "which is the prior cycle") lives in the shared
+    // SeamCycleResolver so the self and manager paths can never drift on it (code-reviewer SHOULD-FIX A).
+    private Task<Cycle> CurrentCycleAsync(CancellationToken ct) => SeamCycleResolver.CurrentCycleAsync(_db, ct);
+
+    private Task<Guid?> PriorCycleIdAsync(Cycle current, CancellationToken ct) =>
+        SeamCycleResolver.PriorCycleIdAsync(_db, current, ct);
 
     private async Task EnsureSubmissionAllowedAsync(Cycle cycle, Guid personId, CancellationToken ct)
     {
@@ -285,3 +305,26 @@ public sealed record SelfAssessmentView(
     bool Submitted,
     bool Editable,
     IReadOnlyList<SelfDimensionView> Dimensions);
+
+/// <summary>One dimension of the caller's moderated result (FR-012): the retained self score, the
+/// moderated (manager) score of record, the manager's comment, and the divergence highlight
+/// (|self − manager|).</summary>
+public sealed record SelfResultDimensionView(
+    Guid DimensionId,
+    string Key,
+    string Name,
+    int DisplayOrder,
+    IReadOnlyList<SelfLevelDescriptor> Levels,
+    int SelfScore,
+    int ManagerScore,
+    string? ManagerComment,
+    int Divergence);
+
+/// <summary>The caller's moderated result for the current cycle (FR-012). Only produced once the
+/// assessment is Moderated or AutoAdopted; the endpoint returns 404 otherwise.</summary>
+public sealed record SelfAssessmentResultView(
+    Guid CycleId,
+    string CycleName,
+    string State,
+    DateTime? ModeratedAt,
+    IReadOnlyList<SelfResultDimensionView> Dimensions);

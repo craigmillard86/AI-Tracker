@@ -63,6 +63,7 @@ api.MapAdminEndpoints();
 api.MapFrameworkEndpoints();
 api.MapCycleEndpoints();
 api.MapAssessmentEndpoints();
+api.MapTeamEndpoints();
 
 app.Run();
 

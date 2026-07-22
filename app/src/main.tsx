@@ -13,7 +13,10 @@ import './screens/signin/SignInScreen.css';
 import './components/LevelSelectorCard/LevelSelectorCard.css';
 import './components/ProgressStepper/ProgressStepper.css';
 import './components/PurposeBanner/PurposeBanner.css';
+import './components/DivergenceFlag/DivergenceFlag.css';
+import './components/ComparisonRow/ComparisonRow.css';
 import './screens/assessment-self/AssessmentSelfScreen.css';
+import './screens/assessment-moderation/AssessmentModerationScreen.css';
 import { App } from './App';
 
 const rootElement = document.getElementById('root');

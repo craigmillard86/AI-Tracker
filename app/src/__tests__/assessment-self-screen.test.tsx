@@ -52,7 +52,9 @@ function buildResponse(overrides: Partial<{ submitted: boolean; editable: boolea
   };
 }
 
-function installFetchMock(response: unknown): void {
+/** `resultResponse` controls GET /api/me/assessment/result: undefined -> 404 (not yet moderated,
+ * the default for most tests), or a body object -> 200 with that body (FR-012 result section). */
+function installFetchMock(response: unknown, resultResponse?: unknown): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -65,6 +67,12 @@ function installFetchMock(response: unknown): void {
       }
       if (url === '/api/me/assessment/submit' && init?.method === 'POST') {
         return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (url === '/api/me/assessment/result') {
+        if (resultResponse === undefined) {
+          return Promise.resolve(new Response('', { status: 404 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(resultResponse), { status: 200 }));
       }
       return Promise.reject(new Error(`unexpected fetch ${String(init?.method)} ${url}`));
     }),
@@ -196,5 +204,61 @@ describe('AssessmentSelfScreen (HAP-8; FR-007/062/066)', () => {
     // canvas, unavailable in jsdom — matching the other screen-level axe tests here).
     const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
+  });
+
+  describe('moderated result (HAP-9; FR-012)', () => {
+    it('shows the plain submitted confirmation when the API reports a 404 (not yet moderated)', async () => {
+      installFetchMock(buildResponse({ submitted: true }));
+
+      render(<AssessmentSelfScreen />);
+
+      expect(await screen.findByText(strings.assessment.submittedTitle)).toBeTruthy();
+      expect(screen.queryByText(strings.result.sectionTitle)).toBeFalsy();
+    });
+
+    it('renders the moderated result section with self, manager, comment, and divergence when the API returns 200', async () => {
+      installFetchMock(buildResponse({ submitted: true }), {
+        cycleId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        cycleName: 'Test cycle',
+        state: 'Moderated',
+        moderatedAt: '2026-07-20T10:00:00Z',
+        dimensions: [
+          {
+            dimensionId: dimensionOneId,
+            key: 'dim-one',
+            name: 'Fictional dimension one',
+            displayOrder: 1,
+            levels: buildLevels('Alpha'),
+            selfScore: 3,
+            managerScore: 1,
+            managerComment: 'Evidence shows assisted use only — moderated down.',
+            divergence: 2,
+          },
+          {
+            dimensionId: dimensionTwoId,
+            key: 'dim-two',
+            name: 'Fictional dimension two',
+            displayOrder: 2,
+            levels: buildLevels('Beta'),
+            selfScore: 1,
+            managerScore: 1,
+            managerComment: null,
+            divergence: 0,
+          },
+        ],
+      });
+
+      const { container } = render(<AssessmentSelfScreen />);
+
+      expect(await screen.findByText(strings.result.sectionTitle)).toBeTruthy();
+      expect(screen.getByText('Evidence shows assisted use only — moderated down.')).toBeTruthy();
+      expect(screen.getByText(strings.result.noComment)).toBeTruthy();
+      // Dimension one diverges by 2 (self L3 vs manager L1) — the red flag; dimension two agrees.
+      expect(screen.getByText(strings.moderation.divergenceValue(2))).toBeTruthy();
+      expect(screen.getByText(strings.moderation.agreeChip)).toBeTruthy();
+
+      const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
+      expect(results.violations).toEqual([]);
+    });
   });
 });

@@ -149,3 +149,153 @@ export async function submitSelfAssessment(): Promise<void> {
     throw new AssessmentWriteError(response.status);
   }
 }
+
+/**
+ * Manager moderation endpoints (HAP-9; contracts/api.md "Manager scope"). Types mirror the API's
+ * camelCase response shapes exactly. The visibility seam enforces chain scope server-side — the
+ * client only ever passes the personId/assessmentId the caller was already shown in their own
+ * review queue.
+ */
+
+export interface TeamReviewItem {
+  /** Null when the report has no assessment row yet — the queue item is shown but not selectable. */
+  assessmentId: string | null;
+  personId: string;
+  displayName: string;
+  onLeave: boolean;
+  state: 'NotStarted' | 'InProgress' | 'Submitted' | 'Moderated' | 'AutoAdopted';
+  /** True only when Submitted and the cycle currently accepts moderation. */
+  canModerate: boolean;
+}
+
+export interface TeamReviewsResponse {
+  cycleId: string;
+  cycleName: string;
+  isManager: boolean;
+  /** Empty when isManager is false. */
+  reviews: TeamReviewItem[];
+}
+
+export interface MemberLevelResponse {
+  level: number;
+  levelName: string;
+  descriptorText: string;
+}
+
+export interface MemberDimensionResponse {
+  dimensionId: string;
+  key: string;
+  name: string;
+  displayOrder: number;
+  levels: MemberLevelResponse[];
+  selfScore: number;
+  selfEvidence: string | null;
+  priorSelfScore: number | null;
+  priorManagerScore: number | null;
+  /** Existing moderated value — null until this dimension has been moderated. */
+  managerScore: number | null;
+  managerComment: string | null;
+  /** FR-063: carry-forward if prior moderated & self unchanged, else adopt self. */
+  defaultManagerScore: number;
+  /** True when the carry-forward/adopt DEFAULT itself diverges at or beyond the sibling
+   * `MemberAssessmentResponse.commentThreshold` from `selfScore` (a sustained prior forced-comment
+   * moderation) — FR-009's forced-comment rule applies even before the manager touches this
+   * dimension, since accepting the default as-is would otherwise 422 on submit. */
+  defaultCommentRequired: boolean;
+}
+
+export interface MemberAssessmentResponse {
+  assessmentId: string;
+  personId: string;
+  displayName: string;
+  cycleId: string;
+  cycleName: string;
+  state: string;
+  onLeave: boolean;
+  /** Submitted AND the cycle accepts moderation (submission lock). */
+  editable: boolean;
+  /** FR-009's forced-comment divergence threshold (domain constant — server-owned, never a client
+   * literal). A dimension's |self - manager| at or beyond this value requires a comment. */
+  commentThreshold: number;
+  dimensions: MemberDimensionResponse[];
+}
+
+export interface ModerationDecision {
+  dimensionId: string;
+  managerScore: number;
+  comment: string | null;
+}
+
+/** GET /api/team/reviews — the caller's review queue. */
+export async function fetchTeamReviews(): Promise<TeamReviewsResponse> {
+  const response = await fetch('/api/team/reviews');
+  if (!response.ok) {
+    throw new Error(`GET /api/team/reviews failed (${response.status})`);
+  }
+  return (await response.json()) as TeamReviewsResponse;
+}
+
+/** GET /api/team/members/{personId}/assessment. Returns null on a 404 (not the caller's direct
+ * report, or no assessment row for them) — an expected steady state, not an error. */
+export async function fetchTeamMemberAssessment(personId: string): Promise<MemberAssessmentResponse | null> {
+  const response = await fetch(`/api/team/members/${personId}/assessment`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/team/members/${personId}/assessment failed (${response.status})`);
+  }
+  return (await response.json()) as MemberAssessmentResponse;
+}
+
+/** PUT /api/team/reviews/{assessmentId} — the moderation write; transitions Submitted -> Moderated
+ * on success. Dimensions omitted from `decisions` are defaulted server-side (carry-forward/adopt). */
+export async function submitModeration(assessmentId: string, decisions: ModerationDecision[]): Promise<void> {
+  const response = await fetch(`/api/team/reviews/${assessmentId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decisions }),
+  });
+  if (response.status !== 204) {
+    throw new AssessmentWriteError(response.status);
+  }
+}
+
+/**
+ * Individual moderated-result endpoint (HAP-9; FR-012). Types mirror
+ * `Hap.Api.AssessmentResultResponse` (System.Text.Json camelCase).
+ */
+
+export interface ResultDimensionResponse {
+  dimensionId: string;
+  key: string;
+  name: string;
+  displayOrder: number;
+  levels: MemberLevelResponse[];
+  selfScore: number;
+  managerScore: number;
+  managerComment: string | null;
+  /** |self - manager|, computed server-side. */
+  divergence: number;
+}
+
+export interface AssessmentResultResponse {
+  cycleId: string;
+  cycleName: string;
+  state: string;
+  moderatedAt: string | null;
+  dimensions: ResultDimensionResponse[];
+}
+
+/** GET /api/me/assessment/result. Returns null on a 404 (not yet moderated) rather than throwing —
+ * the self screen keeps its existing "submitted, awaiting moderation" state in that case. */
+export async function fetchAssessmentResult(): Promise<AssessmentResultResponse | null> {
+  const response = await fetch('/api/me/assessment/result');
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/me/assessment/result failed (${response.status})`);
+  }
+  return (await response.json()) as AssessmentResultResponse;
+}

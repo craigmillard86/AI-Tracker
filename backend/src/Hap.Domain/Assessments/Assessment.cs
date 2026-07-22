@@ -8,11 +8,11 @@ namespace Hap.Domain.Assessments;
 /// the domain is a *definition* location, not a query path; no <c>DbSet</c> is exposed and the only
 /// code that queries the table is the seam's assessment store (architecture-guarded, research D1).
 ///
-/// <para>Forward-only state machine (<see cref="AssessmentState"/>). This story exercises
-/// <see cref="Start"/> and <see cref="Submit"/>; moderation fields
-/// (<see cref="ModeratedAt"/>/<see cref="ModeratedByPersonId"/>) and <see cref="Unmoderated"/> are
-/// carried in the schema now for HAP-9/HAP-10 (data-model.md lists them; the <c>unmoderated</c> flag is
-/// set by cycle-close auto-adoption, FR-068) but are never written here.</para>
+/// <para>Forward-only state machine (<see cref="AssessmentState"/>). HAP-8 exercises
+/// <see cref="Start"/>/<see cref="Submit"/>; HAP-9's <see cref="Moderate"/> writes
+/// <see cref="ModeratedAt"/>/<see cref="ModeratedByPersonId"/> on the <c>Submitted → Moderated</c>
+/// transition. <see cref="Unmoderated"/> remains HAP-10's (set by cycle-close auto-adoption when no
+/// manager review completed, FR-068) and is never written here.</para>
 /// </summary>
 public sealed class Assessment
 {
@@ -62,6 +62,24 @@ public sealed class Assessment
 
         State = AssessmentState.Submitted;
         SubmittedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Submitted → Moderated (FR-008/010): the manager review completed, and the moderated
+    /// (manager) scores are now the score of record. Records who moderated (<paramref name="moderatedByPersonId"/>
+    /// — the reviewer of record, which may differ from the original line manager after an FR-070
+    /// escalation) and the moderation instant. Forward-only: throws if the assessment is not currently
+    /// Submitted (a NotStarted/InProgress assessment has nothing to moderate; a Moderated/AutoAdopted one
+    /// cannot be moderated again). The seam maps the throw to a 409.</summary>
+    public void Moderate(Guid moderatedByPersonId)
+    {
+        if (State != AssessmentState.Submitted)
+        {
+            throw new AssessmentStateException(Id, State, AssessmentState.Moderated);
+        }
+
+        State = AssessmentState.Moderated;
+        ModeratedAt = DateTime.UtcNow;
+        ModeratedByPersonId = moderatedByPersonId;
     }
 }
 
