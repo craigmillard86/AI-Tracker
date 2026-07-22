@@ -1,0 +1,45 @@
+/* DimensionBar — DESIGN.md A8, dashboard-bu. Built exclusively from tokens.css; A2 maturity ramp fills,
+   no new colours, radii, shadows, or type sizes. */
+
+.dimension-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.dimension-bar-track {
+  flex: 1;
+  height: 10px;
+  min-width: 80px;
+}
+
+.dimension-bar-bg {
+  fill: var(--color-ice-blue-surface);
+}
+
+.dimension-bar-fill-0 {
+  fill: var(--color-level-0);
+}
+
+.dimension-bar-fill-1 {
+  fill: var(--color-level-1);
+}
+
+.dimension-bar-fill-2 {
+  fill: var(--color-level-2);
+}
+
+.dimension-bar-fill-3 {
+  fill: var(--color-level-3);
+}
+
+.dimension-bar-value {
+  flex: none;
+  min-width: 28px;
+  text-align: right;
+  font-size: var(--type-table-cell-size);
+  font-weight: var(--type-card-title-weight);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-page-black);
+}

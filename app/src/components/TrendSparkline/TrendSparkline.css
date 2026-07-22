@@ -1,0 +1,11 @@
+/* TrendSparkline — DESIGN.md A8. Built exclusively from tokens.css; brand-teal stroke, no fill, no new
+   colours. Decorative (aria-hidden) — values live in adjacent text. */
+
+.trend-sparkline-line {
+  stroke: var(--color-brand-teal);
+  stroke-width: 2;
+}
+
+.trend-sparkline-dot {
+  fill: var(--color-brand-teal);
+}

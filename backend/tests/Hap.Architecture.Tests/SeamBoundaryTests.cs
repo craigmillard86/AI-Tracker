@@ -56,6 +56,63 @@ public class SeamBoundaryTests
         new(@"\bSet<\s*Assessment", RegexOptions.Compiled),
     };
 
+    // --- HAP-11 BB3: the RollupSnapshot QUERY SURFACE (public DbSet) is structurally seam-bound ---------
+    // The snapshot TYPE is a public domain type freely named in DTOs/projections (unlike the assessment
+    // types), so the guard targets only the QUERY SURFACE — the `RollupSnapshots` DbSet access and
+    // `Set<RollupSnapshot>()` — which is the only way to read raw snapshot figures. Restricting it to the
+    // seam makes F2 STRUCTURAL: a future non-seam file doing `db.RollupSnapshots.Where(...).Select(raw N/mean)`
+    // for a suppressed node fails the build, rather than merely being "today's-code clean".
+    private static readonly string[] RollupQueryAllowedMarkers =
+    {
+        "Hap.Api/Authorization/",                                 // the seam: RollupReads + CycleCloseProcessor
+        "Hap.Infrastructure/HapDbContext.cs",                     // the DbSet DEFINITION
+        "Hap.Infrastructure/Persistence/",                        // EF mapping + generated migrations/snapshot
+        "Hap.Domain/Rollups/",                                    // the entity type definition
+    };
+
+    private static readonly Regex[] RollupQuerySurfacePatterns =
+    {
+        new(@"\.RollupSnapshots\b", RegexOptions.Compiled),                      // the DbSet property access
+        new(@"Set<\s*(?:[A-Za-z_][\w.]*\.)?RollupSnapshot\b", RegexOptions.Compiled), // Set<[...]RollupSnapshot>
+    };
+
+    [Fact]
+    [Trait("Category", "PrivacyReporting")]
+    public void RollupSnapshot_query_surface_is_referenced_only_inside_the_seam()
+    {
+        var files = RepoSource.CsFiles().Select(path => (Path: path, Lines: File.ReadAllLines(path)));
+
+        var offenders = FindReferencesOutsideAllowlist(files, RollupQueryAllowedMarkers, RollupQuerySurfacePatterns);
+
+        Assert.True(offenders.Count == 0,
+            "The RollupSnapshots DbSet / Set<RollupSnapshot> query surface must be read only inside the " +
+            "visibility seam (Hap.Api/Authorization), where every read is projected through the F2 " +
+            "suppression guard. Any other query path could emit raw N/mean/distribution for a suppressed " +
+            "node (FR-071). Offending lines:\n" + string.Join("\n", offenders));
+    }
+
+    [Fact]
+    [Trait("Category", "PrivacyReporting")]
+    public void RollupSnapshot_query_guard_is_not_vacuous_and_flags_a_leak_outside_the_seam()
+    {
+        // Canary: the seam genuinely queries the DbSet, so scanning with a match-nothing allowlist finds it.
+        var files = RepoSource.CsFiles().Select(path => (Path: path, Lines: File.ReadAllLines(path)));
+        var matches = FindReferencesOutsideAllowlist(files, new[] { "____no_such_dir____" }, RollupQuerySurfacePatterns);
+        Assert.True(matches.Count > 0,
+            "Expected the RollupSnapshots query surface to be used SOMEWHERE in backend/src (the seam reads it) " +
+            "— zero matches means the guard is vacuous.");
+
+        // Negative case: a non-seam service querying the snapshots directly for raw figures MUST be caught.
+        var leak = ("backend/src/Hap.Api/RawSnapshotLeak.cs",
+            new[] { "var raw = db.RollupSnapshots.Where(s => s.Suppressed).Select(s => s.N).ToList();" });
+        Assert.NotEmpty(FindReferencesOutsideAllowlist(new[] { leak }, RollupQueryAllowedMarkers, RollupQuerySurfacePatterns));
+
+        // The identical query INSIDE the seam is allowed (it is projected through the F2 guard there).
+        var inSeam = ("backend/src/Hap.Api/Authorization/RollupReads.cs",
+            new[] { "var raw = db.RollupSnapshots.Where(s => s.Suppressed).Select(s => s.N).ToList();" });
+        Assert.Empty(FindReferencesOutsideAllowlist(new[] { inSeam }, RollupQueryAllowedMarkers, RollupQuerySurfacePatterns));
+    }
+
     [Fact]
     [Trait("Category", "PrivacyReporting")]
     public void Assessment_types_and_query_surface_are_referenced_only_in_sanctioned_locations()

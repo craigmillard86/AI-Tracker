@@ -2,9 +2,10 @@ import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { AssessmentModerationScreen } from '../screens/assessment-moderation/AssessmentModerationScreen';
 import { AssessmentSelfScreen } from '../screens/assessment-self/AssessmentSelfScreen';
+import { DashboardScreen } from '../screens/dashboard-bu/DashboardScreen';
 import { strings } from '../strings';
 
-type View = 'self' | 'moderation';
+type View = 'dashboard' | 'self' | 'moderation';
 
 interface NavEntry {
   label: string;
@@ -13,7 +14,7 @@ interface NavEntry {
 }
 
 const navEntries: ReadonlyArray<NavEntry> = [
-  { label: strings.nav.dashboard, view: null },
+  { label: strings.nav.dashboard, view: 'dashboard' },
   { label: strings.nav.selfAssessment, view: 'self' },
   { label: strings.nav.managerReview, view: 'moderation' },
   { label: strings.nav.register, view: null },
@@ -24,8 +25,9 @@ const navEntries: ReadonlyArray<NavEntry> = [
 /**
  * The application frame per DESIGN.md A6: fixed deep-navy top bar, deep-navy left
  * nav, and a light content surface. A plain `useState` view switch (no router library — HAP-9)
- * lets the left-nav swap between the Self-Assessment screen (HAP-8) and the Manager Review screen
- * (HAP-9); other feature screens remain inert nav entries until later stories wire them up. Nav
+ * lets the left-nav swap between the BU Dashboard (HAP-11), the Self-Assessment screen (HAP-8) and
+ * the Manager Review screen (HAP-9); other feature screens remain inert nav entries until later
+ * stories wire them up. Nav
  * items stay native `<a>` elements (role="link") with `aria-current="page"` on the active one — the
  * default-prevented click swaps the view without a real navigation. All chrome copy comes from the
  * externalised strings module (FR-067).
@@ -74,7 +76,9 @@ export function AppShell(): JSX.Element {
         </nav>
 
         <main id="main-content" className="app-content">
-          {view === 'self' ? <AssessmentSelfScreen /> : <AssessmentModerationScreen />}
+          {view === 'dashboard' && <DashboardScreen onStartSelfAssessment={() => setView('self')} />}
+          {view === 'self' && <AssessmentSelfScreen />}
+          {view === 'moderation' && <AssessmentModerationScreen />}
         </main>
       </div>
     </div>

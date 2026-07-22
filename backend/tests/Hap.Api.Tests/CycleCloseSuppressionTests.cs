@@ -467,4 +467,87 @@ public sealed class CycleCloseSuppressionTests
         Assert.Equal(4, allHig.N);
         Assert.Equal(teamHead.N + 1, bu01Snap.N); // the one teamless scored person is the HEAD
     }
+
+    // === HAP-11 BR1: the cross-level differencing defence runs at CLOSE, frozen into the snapshot =========
+
+    [Fact]
+    public async Task A_sub_four_branch_under_a_published_ancestor_is_cross_level_suppressed_in_the_frozen_snapshot()
+    {
+        // An explicitly ADVERSARIAL close fixture (red-team round-2 caveat): a sub-4 branch (BU_C=3, a
+        // single-child Group B / Portfolio 2 chain) sits under the PUBLISHED all-HIG root, alongside a
+        // published Group A (BU_A=4 + BU_B=5 = 9). Per-parent suppression alone would publish BU_A(4) — and
+        // then AllHig(12) − BU_A − BU_B = 3 would recover the sub-4 branch. The cross-level `Close` must run at
+        // close and FREEZE the stronger verdict: BU_A suppressed too, so no published snapshot reveals BU_C.
+        var bus = new[]
+        {
+            Snap.Bu("BU_A", group: "Group A", portfolio: "Portfolio 1"),
+            Snap.Bu("BU_B", group: "Group A", portfolio: "Portfolio 1"),
+            Snap.Bu("BU_C", group: "Group B", portfolio: "Portfolio 2"),
+        };
+        var people = new List<DirectoryPerson>
+        {
+            Snap.Person("ADMIN", "BU_A"),
+            Snap.Person("MGR_A", "BU_A"),
+            Snap.Person("MGR_B", "BU_B"),
+            Snap.Person("HEAD_C", "BU_C"),
+        };
+        for (var i = 1; i <= 4; i++) people.Add(Snap.Person($"E_A{i}", "BU_A", managerExternalRef: "MGR_A"));
+        for (var i = 1; i <= 5; i++) people.Add(Snap.Person($"E_B{i}", "BU_B", managerExternalRef: "MGR_B"));
+        for (var i = 1; i <= 3; i++) people.Add(Snap.Person($"E_C{i}", "BU_C", managerExternalRef: "HEAD_C"));
+
+        var seed = new List<SeedUserRecord> { Snap.SeedUser("ADMIN", role: "Platform Admin") };
+        seed.AddRange(people.Where(p => p.ExternalRef != "ADMIN")
+            .Select(p => Snap.SeedUser(p.ExternalRef, role: "Individual", buCode: p.BuCode)));
+
+        var (admin, fvId) = await SeedAsync(bus, people, seed);
+        var cycleId = await CreateAndOpenCycleAsync(admin, fvId);
+        foreach (var r in Enumerable.Range(1, 4).Select(i => $"E_A{i}")
+                     .Concat(Enumerable.Range(1, 5).Select(i => $"E_B{i}"))
+                     .Concat(Enumerable.Range(1, 3).Select(i => $"E_C{i}")))
+        {
+            await SubmitUniformAsync(r, 2);
+        }
+        foreach (var (mgr, report) in new[] { ("MGR_A", 4), ("MGR_B", 5), ("HEAD_C", 3) }
+                     .SelectMany(t => Enumerable.Range(1, t.Item2)
+                         .Select(i => (t.Item1, $"E_{t.Item1[^1]}{i}"))))
+        {
+            await ModerateUniformAsync(mgr, report, 2);
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync($"/api/cycles/{cycleId}/close", null)).StatusCode);
+
+        Guid buA, buB, buC, groupA, groupB;
+        using (var scope = _factory.NewScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HapDbContext>();
+            buA = (await db.BusinessUnits.SingleAsync(b => b.Code == "BU_A")).Id;
+            buB = (await db.BusinessUnits.SingleAsync(b => b.Code == "BU_B")).Id;
+            buC = (await db.BusinessUnits.SingleAsync(b => b.Code == "BU_C")).Id;
+            groupA = (await db.Groups.SingleAsync(g => g.Name == "Group A")).Id;
+            groupB = (await db.Groups.SingleAsync(g => g.Name == "Group B")).Id;
+        }
+
+        var buASnap = await SnapshotAsync(cycleId, OrgNodeType.Bu, buA);
+        var buBSnap = await SnapshotAsync(cycleId, OrgNodeType.Bu, buB);
+        var buCSnap = await SnapshotAsync(cycleId, OrgNodeType.Bu, buC);
+        var groupASnap = await SnapshotAsync(cycleId, OrgNodeType.Group, groupA);
+        var groupBSnap = await SnapshotAsync(cycleId, OrgNodeType.Group, groupB);
+        var allHig = await SnapshotAsync(cycleId, OrgNodeType.AllHig, null);
+
+        // The sub-4 branch is frozen suppressed.
+        Assert.True(buCSnap.Suppressed);
+        Assert.True(groupBSnap.Suppressed);
+        // The cross-level Close ran AT CLOSE: BU_A (n=4, ≥ threshold, per-parent-published) is frozen
+        // SUPPRESSED because AllHig − BU_A − BU_B would otherwise recover BU_C. This is the proof the
+        // hierarchy-global defence is in the snapshot, not only in the live read.
+        Assert.True(buASnap.Suppressed);
+        Assert.Equal("Complement", buASnap.SuppressionReason);
+        Assert.True(groupASnap.Suppressed); // equal-membership with its portfolio, collapsed
+        // …while the useful high-level total and the safe sibling survive, and neither reveals BU_C:
+        // AllHig(12) − BU_B(5) = 7 = BU_A + BU_C, a two-unknown sum, never the single figure 3.
+        Assert.False(allHig.Suppressed);
+        Assert.Equal(12, allHig.N);
+        Assert.False(buBSnap.Suppressed);
+        Assert.Equal(5, buBSnap.N);
+    }
 }

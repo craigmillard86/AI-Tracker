@@ -64,6 +64,7 @@ api.MapFrameworkEndpoints();
 api.MapCycleEndpoints();
 api.MapAssessmentEndpoints();
 api.MapTeamEndpoints();
+api.MapRollupEndpoints();
 
 app.Run();
 

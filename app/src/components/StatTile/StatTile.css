@@ -1,0 +1,73 @@
+/* StatTile — DESIGN.md A8, dashboard-bu KPI. Built exclusively from tokens.css; no new colours, radii,
+   shadows, or type sizes. */
+
+.stat-tile {
+  background: var(--color-pure-white);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md-lg);
+}
+
+.stat-tile-label {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-sm);
+}
+
+.stat-tile-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.stat-tile-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md-sm);
+  font-family: var(--font-family-ui);
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-section-title-weight);
+  line-height: 1;
+}
+
+.stat-tile-aside {
+  flex: none;
+}
+
+.stat-tile-trend {
+  margin-top: var(--space-sm);
+  font-size: var(--type-table-cell-size);
+  font-weight: var(--type-label-weight);
+}
+
+/* Colour reinforces the arrow glyph + text (A5) — it is never the sole signal. */
+.stat-tile-trend-up {
+  color: var(--color-rag-green);
+}
+
+.stat-tile-trend-down {
+  color: var(--color-rag-red);
+}
+
+.stat-tile-trend-flat {
+  color: var(--color-mid-gray-text);
+}
+
+.stat-tile-sub {
+  margin-top: var(--space-sm);
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+}
+
+.stat-tile-alert {
+  border-color: var(--color-rag-red);
+}
+
+.stat-tile-alert .stat-tile-value {
+  color: var(--color-rag-red);
+}

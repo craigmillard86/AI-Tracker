@@ -1,0 +1,29 @@
+/* SuppressedCell — DESIGN.md A8 / FR-071. Built exclusively from tokens.css; no new colours, radii,
+   shadows, or type sizes. Never a number, never blank. */
+
+.suppressed-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  color: var(--color-mid-gray-text);
+  font-size: var(--type-table-cell-size);
+}
+
+.suppressed-cell-dash {
+  font-weight: var(--type-button-weight);
+}
+
+.suppressed-cell-text {
+  font-style: italic;
+}
+
+.suppressed-cell-block {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-md-lg);
+  background: var(--color-light-gray-surface);
+  border: 1px solid var(--color-border-gray);
+  border-radius: var(--radius-card);
+  font-size: var(--type-body-size);
+}

@@ -18,6 +18,11 @@ public static class AuthorizationServiceCollectionExtensions
         services.AddSingleton(SeamOptions.Default);
         services.AddSingleton<ChainResolver>();
         services.AddSingleton<SuppressionEvaluator>();
+        // The shared rollup pipeline (HAP-11): the single "moderated scores → per-node rollups + frozen
+        // suppression" definition, used by BOTH the cycle-close snapshot writer and the live open-cycle
+        // dashboard reader, so the two agree by construction (research D4). Its DB reads take the context as
+        // a parameter (it holds only the suppression evaluator + a logger), so singleton is safe.
+        services.AddSingleton<RollupPipeline>();
         services.AddScoped<OrgGraphLoader>();
 
         // The assessment seam (HAP-8): one DbSet-backed store behind both storage ports (cross-person
@@ -33,6 +38,12 @@ public static class AuthorizationServiceCollectionExtensions
         // audit). Wraps the same request-scoped store/gateway/context — a cross-person read never escapes
         // the seam.
         services.AddScoped<ManagerModerationService>();
+
+        // The aggregate-read gateway (HAP-11): BU dashboard, org rollups, own-team summary. Scope decided
+        // in-seam (hierarchy anchors + explicit grants, Q-024); every figure projected through the F2
+        // suppression guard so a suppressed node emits no number. Scoped — wraps the request-scoped context;
+        // depends on HierarchyRoleResolver (registered by AddHapIdentity) for aggregate-scope anchors only.
+        services.AddScoped<RollupReads>();
 
         // The cycle-close processor (HAP-10): auto-adoption + rollup snapshots + frozen suppression.
         // It implements Hap.Infrastructure's ICycleCloseProcessor port but LIVES here because it reads

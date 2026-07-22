@@ -1,0 +1,234 @@
+/* DashboardScreen — DESIGN.md A6/A8; layout/IA per docs/design/mockups/dashboard-bu.html (binding).
+   Built exclusively from tokens.css; A2 maturity ramp, no new colours, radii, shadows, or type sizes. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.dashboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+/* The single primary CTA per view (DESIGN.md A3): filled brand-teal pill, links to self-assessment. */
+.dashboard-cta {
+  flex: none;
+  font-family: var(--font-family-ui);
+  font-weight: var(--type-button-weight);
+  font-size: var(--type-button-size);
+  color: var(--color-pure-white);
+  background: var(--color-brand-teal);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-pill);
+  height: 40px;
+  padding: 0 var(--space-lg);
+  cursor: pointer;
+}
+
+.dashboard-cta:hover {
+  background: var(--color-feedback-info);
+}
+
+.dashboard-crumb {
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-sm);
+}
+
+.dashboard-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--type-page-title-size);
+  line-height: var(--type-page-title-line);
+  font-weight: var(--type-page-title-weight);
+  color: var(--color-page-black);
+}
+
+.dashboard-subtitle {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.dashboard-freshness {
+  margin: var(--space-xs) 0 var(--space-lg);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+}
+
+.dashboard-status {
+  margin: var(--space-md) 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.dashboard-status-error {
+  color: var(--color-feedback-error);
+}
+
+.dashboard-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md-lg);
+  margin-bottom: var(--space-md-lg);
+}
+
+.dashboard-sparkline-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dashboard-card {
+  background: var(--color-pure-white);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md-lg) var(--space-lg);
+  margin-bottom: var(--space-md-lg);
+}
+
+.dashboard-card-head {
+  margin-bottom: var(--space-md);
+}
+
+.dashboard-card-title {
+  margin: 0;
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+}
+
+.dashboard-card-hint {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+}
+
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-table-cell-size);
+}
+
+.dashboard-table thead th {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md-sm);
+  border-bottom: 1.5px solid var(--color-border-gray);
+  background: var(--color-light-gray-surface);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+}
+
+.dashboard-table td {
+  padding: var(--space-md-sm);
+  border-bottom: 1px solid var(--color-light-gray-surface);
+  vertical-align: middle;
+}
+
+.dashboard-col-center {
+  text-align: center;
+}
+
+.dashboard-col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-stub {
+  color: var(--color-mid-gray-text);
+}
+
+/* Maturity-gap callout — red-tint per the mockup (a floor blocked from rising is off-track), paired with
+   the ⚠ glyph + text so colour is never the sole signal (A5). */
+.dashboard-callout {
+  margin: var(--space-md) 0 0;
+  padding: var(--space-md-sm) var(--space-md);
+  border: 1px solid var(--color-rag-red);
+  background: var(--color-rag-red-tint);
+  border-radius: var(--radius-card);
+  font-size: var(--type-table-cell-size);
+  color: var(--color-rag-red);
+}
+
+.dashboard-pipeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.dashboard-pipeline-cell {
+  text-align: center;
+  padding: var(--space-md);
+  background: var(--color-light-gray-surface);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+}
+
+.dashboard-pipeline-value {
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-section-title-weight);
+}
+
+.dashboard-pipeline-label {
+  margin-top: var(--space-xs);
+  font-size: var(--type-table-cell-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-slate-text);
+}
+
+.dashboard-suppressed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Maturity ramp badge (A2) — level number always printed (A2 rule), colour is reinforcement only. */
+.maturity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 32px;
+  padding: 0 var(--space-md-sm);
+  border-radius: var(--radius-pill); /* A4 badge/chip recipe: pill radius + small-label-tracked type */
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+}
+
+.maturity-badge-0 {
+  background: var(--color-level-0);
+  color: var(--color-page-black);
+}
+
+.maturity-badge-1 {
+  background: var(--color-level-1);
+  color: var(--color-deep-navy);
+}
+
+.maturity-badge-2 {
+  background: var(--color-level-2);
+  color: var(--color-pure-white);
+}
+
+.maturity-badge-3 {
+  background: var(--color-level-3);
+  color: var(--color-pure-white);
+}

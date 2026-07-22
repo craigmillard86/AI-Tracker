@@ -299,3 +299,111 @@ export async function fetchAssessmentResult(): Promise<AssessmentResultResponse 
   }
   return (await response.json()) as AssessmentResultResponse;
 }
+
+/**
+ * Aggregate rollup endpoints (HAP-11; contracts/api.md [S] "BU Lead scope", "Group/Portfolio/HIG
+ * Executive scope", own-team summary). Every response is suppression-projected server-side: a
+ * suppressed node carries `suppressed: true` + a reason and `figures: null` — the client never
+ * receives a number for a suppressed aggregate (F2 / FR-071). Types mirror
+ * `Hap.Api.NodeAggregateResponse` (System.Text.Json camelCase).
+ */
+
+export interface AggregateFigures {
+  n: number;
+  /** Per-dimension mean of the moderated score of record (FR-015), keyed by dimension key. */
+  perDimensionMean: Record<string, number>;
+  /** Count of people at each floor level 0–3 (FR-016/018), keyed by the level as a string. */
+  floorLevelDistribution: Record<string, number>;
+  completionPct: number;
+  unmoderatedPct: number;
+}
+
+export interface DimensionMeta {
+  key: string;
+  name: string;
+  displayOrder: number;
+}
+
+export interface TrendPoint {
+  cycleId: string;
+  cycleName: string;
+  suppressed: boolean;
+  suppressionReason: string | null;
+  /** Null when that cycle's node was suppressed. */
+  figures: AggregateFigures | null;
+}
+
+export interface NodeAggregate {
+  nodeType: string;
+  nodeRef: string | null;
+  nodeName: string;
+  cycleId: string;
+  cycleName: string;
+  cycleState: string;
+  /** True when computed live from an open cycle; false when read from a frozen snapshot. */
+  live: boolean;
+  suppressed: boolean;
+  suppressionReason: string | null;
+  /** Null when the node is suppressed — no number is ever sent for a suppressed aggregate. */
+  figures: AggregateFigures | null;
+  dimensions: DimensionMeta[];
+  trend: TrendPoint[];
+  /** FR-041 cross-module initiative counts — a null stub until HAP-13 ships the register. */
+  initiatives: null;
+}
+
+/** GET /api/me/dashboard — the caller's DEFAULT dashboard node (BB2): the richest scope they lead
+ * (Exec → all-HIG, Portfolio/Group Leader → their node, BU Lead → their BU, else → own team), resolved
+ * and scope-checked server-side. Returns null on a 404 (no open cycle, or nothing to show). This is the
+ * one call the router-less shell makes so each persona reaches their scope. */
+export async function fetchDashboard(): Promise<NodeAggregate | null> {
+  const response = await fetch('/api/me/dashboard');
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/me/dashboard failed (${response.status})`);
+  }
+  return (await response.json()) as NodeAggregate;
+}
+
+/** GET /api/me/team/summary — the caller's own team aggregate ([S], self-scoped, no id). Returns null
+ * on a 404 (no open cycle, or the caller has no team of their own) rather than throwing. */
+export async function fetchTeamSummary(): Promise<NodeAggregate | null> {
+  const response = await fetch('/api/me/team/summary');
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/me/team/summary failed (${response.status})`);
+  }
+  return (await response.json()) as NodeAggregate;
+}
+
+/** GET /api/bus/{buId}/dashboard — the BU dashboard ([S]). Returns null on a 404 (out of the caller's
+ * scope, or no open cycle). Available for an org-tree / BU-picker entry point (a later story). */
+export async function fetchBuDashboard(buId: string): Promise<NodeAggregate | null> {
+  const response = await fetch(`/api/bus/${buId}/dashboard`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/bus/${buId}/dashboard failed (${response.status})`);
+  }
+  return (await response.json()) as NodeAggregate;
+}
+
+/** GET /api/org/{nodeType}/{nodeId}/rollup (or /api/org/allhig/rollup) — Group/Portfolio/AllHig
+ * aggregates only ([S]; FR-025). Returns null on a 404 (out of scope, or no open cycle). */
+export async function fetchOrgRollup(nodeType: string, nodeId?: string): Promise<NodeAggregate | null> {
+  const path =
+    nodeType === 'allhig' || !nodeId ? '/api/org/allhig/rollup' : `/api/org/${nodeType}/${nodeId}/rollup`;
+  const response = await fetch(path);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET ${path} failed (${response.status})`);
+  }
+  return (await response.json()) as NodeAggregate;
+}
