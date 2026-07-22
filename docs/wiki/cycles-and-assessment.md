@@ -2,6 +2,31 @@
 
 _Subsystem shipped incrementally by HAP-7 (cycle state machine) and extended by HAP-8..HAP-10 (scoring, moderation, close). Describes shipped behaviour only; WHAT/WHY live in `docs/spec/` + `specs/`, decisions in `docs/decisions/`._
 
+## Self-assessment (HAP-8 — FR-007/062/066)
+
+The first real assessment data. `Assessment` (per cycle+person, states InProgress → Submitted, forward-only; carries the `unmoderated` flag for HAP-10) and `AssessmentScore` (one row per assessment per dimension, 0–3) live in `Hap.Domain/Assessments`. Migration #4 registers them **without a public DbSet** — the seam's `SeamAssessmentStore` (`db.Set<Assessment>()`) is the ONLY code that touches the tables, enforced by the boundary guard extended to the DbSet form plus a reflection guard pinning `SeamAssessmentStore` as the sole implementer of `IAssessmentStore`/`ISelfAssessmentStore`.
+
+### Endpoints (`Hap.Api/AssessmentEndpoints.cs`, `SelfAssessmentService`)
+
+`GET /api/me/assessment`, `PUT …/scores`, `POST …/submit` — **self-scope only: the subject is always the session caller** (`person_id` claim); no route/body/query/header carries a person id, so cross-person access is structurally impossible. Each call, in order: resolve the current cycle → **invitation gate** → submission lock → dimension validation → store.
+
+- **GET** returns the 7 dimensions + descriptors from framework data (never hard-coded), prior-cycle scores pre-populated (FR-062), the FR-066 purpose-limitation copy key, and an `Editable` flag.
+- **PUT** upserts partial progress (0–3 per dimension); reopening restores in-progress values.
+- **Submit** transitions InProgress → Submitted; writes after submit → 409.
+- Self views are **not audited** (per contract); the data path is still seam-only.
+
+### Participation & integrity gates
+
+- **Invitation gate (FR-002/004/005, US1 precondition):** every self operation requires a non-excluded `CycleInvitation` for the resolved cycle. A contractor (excluded) or a not-onboarded-BU person gets **404** on read and both write paths and lands **no row** — participation exclusion is held at the write, the cheapest place. *(Defense-in-depth carry-forward: rollup/Harris queries in HAP-10/11/19 must still inner-join `cycle_invitations WHERE Excluded=false`.)*
+- **Dimension membership:** a `DimensionId` not in the resolved cycle's framework version (or `Guid.Empty`, or a duplicate in one payload) is rejected **422 before any write** — no phantom score, no FK-500.
+- **Submission lock (Q-017a):** both the score-write and submit paths consult `Cycle.AllowsSubmission` — post-close write → **423** unless a late override exists. "Current cycle" resolves Open, else the most-recently-Closed (the override window); Draft is never current.
+
+Status codes: 423 locked · 409 already-submitted / no-cycle-on-write · 422 incomplete / out-of-range / bad-dimension · 404 no-cycle-on-GET / not-invited.
+
+### UI (`app/src/screens/assessment-self`, components `LevelSelectorCard`/`ProgressStepper`/`PurposeBanner`)
+
+One dimension per section, four LevelSelectorCards (native radio group + arrow-key nav; selected = 2px teal border + check icon, never colour-alone), per-dimension evidence, PurposeBanner above the first section, ProgressStepper "x of 7" + projected floor (the 5-of-7 → floor L0 state is the binding mockup case). A pre-populated prior value shows a "last month" pill but doesn't count toward progress until re-confirmed. When the cycle is closed without an override the form renders **read-only** (A4 disabled treatment on cards/evidence/buttons + a notice). SC-007 WCAG 2.2 AA (keyboard-only completion, vitest-axe); strings externalised; tokens.css only.
+
 ## Cycle state machine (HAP-7 — FR-002/003/004/005/006/060)
 
 One global monthly assessment cycle per framework. `Cycle` is a **forward-only** state machine: `Draft → Open → Closed`. `Open()` and `Close()` reject any other transition; there is no path back. At most one `Open` cycle exists per framework at a time (a second `open` returns 409).

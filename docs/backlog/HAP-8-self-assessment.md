@@ -5,12 +5,25 @@ epic: E2-assessment
 wave: 1
 fr: [FR-007, FR-062, FR-066]
 risk: L3                # trigger: read/write path over Assessments/AssessmentScores tables
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-21T23:04:23Z, end: 2026-07-22T00:45:41Z, mins: 102}
   - {phase: qa, start: 2026-07-22T00:47:31Z, end: 2026-07-22T01:05:54Z, mins: 18}
-closure: null
+closure:
+  sha: 2956b85
+  files: [backend/src/Hap.Domain/Assessments/**, backend/src/Hap.Api/Authorization/{SeamAssessmentStore,SelfAssessmentService,AssessmentData}.cs, backend/src/Hap.Api/AssessmentEndpoints.cs, backend/src/Hap.Infrastructure/Persistence/{AssessmentEntityConfiguration.cs,Migrations/20260721232108_AddAssessments*}, app/src/screens/assessment-self/**, app/src/components/{LevelSelectorCard,ProgressStepper,PurposeBanner}/**, backend/tests/**, app/src/__tests__/**, docs/wiki/cycles-and-assessment.md]
+  tests: "backend 340 (Api 242 incl. self-assessment + QA adversarial); PrivacyReporting 145; frontend 93; migration #4 idempotent + chains behind #3; seam boundary guard extended to the DbSet form (non-vacuous) + sole-implementer reflection guard; verify.sh ALL GREEN"
+  risk: L3
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team, hap-design-reviewer]
+  rounds: 3
+  date: 2026-07-22
+  note: "L3+design panel over 3 rounds. Round 1: domain BLOCKED on missing invitation gating (an excluded contractor / not-onboarded person could land a real Assessment row — US1 precondition + FR-002/FR-005 violation); red-team confirmed reachable; I ruled fix-now (overruling the red-team's defer-to-G2). Round 2: gating (EnsureInvitedAsync → 404 on all 3 paths pre-lock) + dimension-membership validation (elevated to blocking, → 422) landed; code/domain/red-team signed off. Round 3: design caught the read-only UX tweak shipped no :disabled styling (locked card looked editable) — fixed A4-consistent + tested. QA: no cross-person path (structurally no personId surface, tested all 7 roles + splice attempts), no uninvited row lands, no phantom score, no lock bypass, concurrent double-submit resolves to one row."
+  carry_forward:
+    - "G2 defense-in-depth (red-team + domain, binding): even with write-side invitation gating, rollup/Harris queries (HAP-10/HAP-11/HAP-19) MUST inner-join cycle_invitations WHERE Excluded=false — write-side gating alone doesn't prove every future read path re-derives eligibility, and the entitled population must not desync from the reported one (Art. VI.4)."
+    - "Seam boundary is a source-scan regex + a sole-implementer reflection guard — not a compiler proof (comment corrected). A raw-SQL lowercase read of the underscore-free `assessments` table, or reflection-by-constructed-name, evades the text scan (no current code does; low severity). A Roslyn analyzer is the durable fix — future hardening pass."
+    - "MSB3277 EFCore.Relational 8.0.4 (via Npgsql 8.0.4) vs EFCore 8.0.8 — pre-existing MSBuild version conflict (not caught by warnings-as-errors); align in a dedicated L2 dependency story."
+    - "User-facing behaviour shipped (self-assessment flow) — HAP-21 (in-app help + user-guide baseline, Wave 2) must capture it; no user-guide page exists yet to update."
 ---
 ## Story
 As an Individual in an open cycle, I complete my monthly self-assessment — one dimension per section with level descriptors inline, pre-populated from last cycle, optional evidence — under an explicit "development, not performance management" statement, so a no-change month takes seconds and my data enters the system only through the seam.
