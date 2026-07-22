@@ -503,3 +503,31 @@ moderation** — `AuthorizeIndividualRead`'s BusinessUnit reach requires the sub
 direct report), so the read conjunct fails and, with it, moderation. This is a safe under-grant (fails closed), and it is
 the same shape of "who moderates when the natural reviewer can't" question as the senior-leader gap above, so it rides
 the same Q-020 owner ruling rather than a separate fix.
+
+## Q-021 — the docker-compose runtime cannot boot end-to-end (local-runtime drift)
+
+**Raised:** 2026-07-22 (session lead, while starting the stack for an owner UI test) · **Type:** runtime/infra gap, not a spec ambiguity
+
+Running the stack per `specs/001-maturity-initiative-register/quickstart.md` does **not** produce a working app — three
+gaps, none caught by `verify.sh` (which uses its own DB harness and never exercises the compose runtime path):
+
+1. **No schema migration at startup.** `Program.cs` never calls `db.Database.Migrate()`, and nothing else does, so the
+   compose Postgres starts empty (`relation "people" does not exist`). Migrations only ever run inside `verify.sh`.
+2. **Synth data + framework files never reach the api image.** `backend/Dockerfile` publishes only the API to `/app`;
+   `directory.json`, `seed-users.json`, and `docs/frameworks/ai-maturity-sdlc.v1.json` are read from `AppContext.BaseDirectory`
+   (=`/app`) at runtime but are neither COPY'd into the image nor bind-mounted in `docker-compose.yml`. (The framework
+   locator's own comment already acknowledges this "known gap.")
+3. **Bootstrap deadlock.** `LocalDevProvider.SignInAsync` requires a synced `Person`; `POST /api/admin/sync` requires a
+   `PlatformAdmin` session — so no one can perform the first sync. There is no seed-on-boot or bootstrap admin.
+
+The owner tested on 2026-07-22 via a **manual, runtime-only bootstrap** (host `dotnet ef database update` → `docker cp`
+the three files in → SQL-seed one admin Person+grant → drive sync/framework/cycle over the API). That instance is
+ephemeral (lost on api-container recreate) and no repo files were changed for it.
+
+**Proposed fix (a small "runtime bootstrap" story):** startup `Migrate()` behind a dev/env flag; COPY the synth output +
+`docs/frameworks` into the runtime image (or bind-mount in compose); and a seed-on-boot (or a documented, auth-exempt
+first-run bootstrap) so `docker compose up` + the quickstart actually work. Reconciles the stack with constitution Art.
+IX.1 ("`docker compose up -d --build` is the whole stack").
+
+**Owner decision needed:** file this as a new backlog story, or treat it as **HAP-1 (scaffold-and-gate) drift** to be
+repaired under that story's remit? **Status:** OPEN.
