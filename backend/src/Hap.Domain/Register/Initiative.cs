@@ -5,13 +5,14 @@ namespace Hap.Domain.Register;
 /// Register data — NOT individual assessment data — so it is not seam-guarded and carries a public
 /// DbSet.
 ///
-/// <para><b>Scope of this entity (HAP-13).</b> Identity, classification, create/edit authority inputs,
-/// and just enough lifecycle state for the list screen to render: <see cref="CurrentStage"/> is fixed
-/// to <see cref="InitiativeStage.Idea"/> at creation (there is deliberately NO stage-change method here
-/// — the forward-only transition endpoint is HAP-14), <see cref="RagStatus"/> defaults to OnTrack, and
-/// <see cref="LastUpdateAt"/> starts equal to <see cref="RegisteredAt"/>. Stage history, weekly updates,
-/// NR lines, and the value-capture / governance panels are later stories and are absent by design
-/// (constitution Art. II.1 — no FR citation, no code).</para>
+/// <para><b>Scope of this entity (HAP-13 + HAP-14).</b> HAP-13 shipped identity, classification,
+/// create/edit authority inputs, and just enough lifecycle state for the list screen to render. HAP-14
+/// adds the forward-only stage machine (<see cref="AdvanceStage"/>), the weekly RAG update
+/// (<see cref="PostWeeklyUpdate"/>), and the governance/technology panels (FR-030/FR-032, informational
+/// only — §4.2, no approval gate). Stage HISTORY, weekly update HISTORY, and NR lines are their own
+/// entities (<see cref="InitiativeStageHistory"/>, <see cref="InitiativeWeeklyUpdate"/>,
+/// <see cref="InitiativeNRLine"/>) — this entity holds only the CURRENT lifecycle state each rolls up
+/// into (<see cref="CurrentStage"/>, <see cref="RagStatus"/>, <see cref="LastUpdateAt"/>).</para>
 ///
 /// <para><see cref="DimensionsAdvanced"/> holds framework dimension KEYS (e.g. "how-ai-is-leveraged"),
 /// not FKs to a version-bound Dimension row: a version-bound FK would break as the framework versions,
@@ -48,6 +49,20 @@ public sealed class Initiative
     public int? CustomersInProduction { get; private set; }
     public RiskTier RiskTier { get; private set; }
 
+    // HAP-14 governance panel (FR-030 — informational only, §4.2: no approval semantics anywhere; no
+    // code path reads ApprovalStatus to gate a write, see RegisterDetailEndpointsTests' explicit proof).
+    public DataSensitivity DataSensitivity { get; private set; }
+    public List<string> RegulatoryRelevance { get; private set; } = new();
+    public string? ApprovalStatus { get; private set; }
+    public string? Approver { get; private set; }
+    public string? OversightModel { get; private set; }
+    public string? GovernanceNotes { get; private set; }
+
+    // HAP-14 technology panel (FR-032).
+    public List<string> ModelsProviders { get; private set; } = new();
+    public List<string> VendorsTools { get; private set; } = new();
+    public bool UsesCogito { get; private set; }
+
     // EF materialisation constructor (all columns, incl. the backing lists via the collection nav).
     private Initiative(
         Guid id,
@@ -64,7 +79,13 @@ public sealed class Initiative
         RagStatus ragStatus,
         DateTime lastUpdateAt,
         int? customersInProduction,
-        RiskTier riskTier)
+        RiskTier riskTier,
+        DataSensitivity dataSensitivity,
+        string? approvalStatus,
+        string? approver,
+        string? oversightModel,
+        string? governanceNotes,
+        bool usesCogito)
     {
         Id = id;
         BusinessUnitId = businessUnitId;
@@ -81,6 +102,12 @@ public sealed class Initiative
         LastUpdateAt = lastUpdateAt;
         CustomersInProduction = customersInProduction;
         RiskTier = riskTier;
+        DataSensitivity = dataSensitivity;
+        ApprovalStatus = approvalStatus;
+        Approver = approver;
+        OversightModel = oversightModel;
+        GovernanceNotes = governanceNotes;
+        UsesCogito = usesCogito;
     }
 
     /// <summary>
@@ -121,16 +148,26 @@ public sealed class Initiative
             ragStatus: RagStatus.OnTrack,
             lastUpdateAt: now,
             customersInProduction,
-            riskTier);
+            riskTier,
+            dataSensitivity: DataSensitivity.None,
+            approvalStatus: null,
+            approver: null,
+            oversightModel: null,
+            governanceNotes: null,
+            usesCogito: false);
         initiative.SetFunctions(functionsAffected);
         initiative.SetDimensions(dimensionsAdvanced);
+        // RegulatoryRelevance/ModelsProviders/VendorsTools default empty (list initialisers above).
         return initiative;
     }
 
     /// <summary>
     /// Apply an edit (PUT). Re-validates the same required-field / range invariants. Deliberately
     /// cannot change <see cref="BusinessUnitId"/> (reassignment is out of scope) or
-    /// <see cref="CurrentStage"/> (forward-only stage change is HAP-14's endpoint).
+    /// <see cref="CurrentStage"/> (forward-only stage change is <see cref="AdvanceStage"/>'s job).
+    /// The governance/technology params (HAP-14, FR-030/FR-032) re-validate NOTHING beyond what
+    /// <see cref="Guard"/> already checks — governance is informational-only (§4.2), so there is no new
+    /// invariant to enforce.
     /// </summary>
     public void Edit(
         string name,
@@ -142,7 +179,16 @@ public sealed class Initiative
         IEnumerable<string>? functionsAffected,
         IEnumerable<string>? dimensionsAdvanced,
         int? customersInProduction,
-        RiskTier riskTier)
+        RiskTier riskTier,
+        DataSensitivity dataSensitivity = DataSensitivity.None,
+        IEnumerable<string>? regulatoryRelevance = null,
+        string? approvalStatus = null,
+        string? approver = null,
+        string? oversightModel = null,
+        string? governanceNotes = null,
+        IEnumerable<string>? modelsProviders = null,
+        IEnumerable<string>? vendorsTools = null,
+        bool usesCogito = false)
     {
         Guard(BusinessUnitId, name, ownerPersonId, categoryId, aiDlcLevel, customersInProduction);
 
@@ -156,6 +202,67 @@ public sealed class Initiative
         RiskTier = riskTier;
         SetFunctions(functionsAffected);
         SetDimensions(dimensionsAdvanced);
+
+        DataSensitivity = dataSensitivity;
+        RegulatoryRelevance = Clean(regulatoryRelevance).ToList();
+        ApprovalStatus = NullIfBlank(approvalStatus);
+        Approver = NullIfBlank(approver);
+        OversightModel = NullIfBlank(oversightModel);
+        GovernanceNotes = NullIfBlank(governanceNotes);
+        ModelsProviders = Clean(modelsProviders).ToList();
+        VendorsTools = Clean(vendorsTools).ToList();
+        UsesCogito = usesCogito;
+    }
+
+    /// <summary>
+    /// Forward-only stage transition (FR-028). The enum's DECLARATION ORDER is the forward order
+    /// (Idea &lt; Evaluation &lt; Pilot &lt; Production &lt; Scaled &lt; Retired), so an ordinal
+    /// comparison decides forward-vs-backward — this intentionally ALLOWS multi-step forward jumps
+    /// (e.g. Idea straight to Pilot skips Evaluation entirely): "forward-only" does not mean "one step
+    /// at a time". Throws <see cref="InitiativeStageTransitionException"/> when <see cref="CurrentStage"/>
+    /// is already <see cref="InitiativeStage.Retired"/> (terminal — no further transition, forward or
+    /// not), or when <paramref name="newStage"/> is not strictly greater than the current stage
+    /// (backward or same-stage no-op). Returns the PRIOR stage on success — the caller needs it to build
+    /// the <see cref="InitiativeStageHistory"/> row; this method does not write history itself (keeping
+    /// persistence out of the domain model, matching this codebase's existing convention).
+    /// </summary>
+    public InitiativeStage AdvanceStage(InitiativeStage newStage)
+    {
+        if (CurrentStage == InitiativeStage.Retired)
+        {
+            throw new InitiativeStageTransitionException("Retired is terminal — no further stage transition is possible.");
+        }
+        if (newStage <= CurrentStage)
+        {
+            throw new InitiativeStageTransitionException(
+                $"Stage transitions are forward-only: cannot move from {CurrentStage} to {newStage}.");
+        }
+
+        var priorStage = CurrentStage;
+        CurrentStage = newStage;
+        return priorStage;
+    }
+
+    /// <summary>Records a weekly RAG update (FR-033): refreshes <see cref="RagStatus"/> and
+    /// <see cref="LastUpdateAt"/>. Does not write the <see cref="InitiativeWeeklyUpdate"/> history row
+    /// itself — the caller (endpoint) does that, matching <see cref="AdvanceStage"/>'s convention.</summary>
+    public void PostWeeklyUpdate(RagStatus rag, DateTime at)
+    {
+        RagStatus = rag;
+        LastUpdateAt = at;
+    }
+
+    /// <summary>Sets (or clears) the customers-in-production figure directly, bypassing the full
+    /// <see cref="Edit"/> re-validation — used by the weekly-update endpoint (FR-031/FR-033), where only
+    /// this one field may change alongside the RAG/note. Category-kind gating (customer-deployed
+    /// categories only) is the caller's responsibility (the entity has no category-flag reference).</summary>
+    public void SetCustomersInProduction(int? value)
+    {
+        if (value is < 0)
+        {
+            throw new InitiativeValidationException("Customers in production cannot be negative.");
+        }
+        CustomersInProduction = value;
     }
 
     private static void Guard(

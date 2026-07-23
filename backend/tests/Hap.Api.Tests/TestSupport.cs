@@ -103,6 +103,7 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
             "TRUNCATE audit_log, org_overrides, role_grants, people, business_units, groups, portfolios, " +
             "level_descriptors, dimensions, framework_versions, frameworks, " +
             "cycle_invitations, cycle_late_overrides, cycles, " +
+            "initiative_stage_history, initiative_weekly_updates, initiative_nr_lines, " +
             "initiatives, harris_categories, harris_stage_map RESTART IDENTITY CASCADE; " +
             "SET session_replication_role = 'origin';");
     }

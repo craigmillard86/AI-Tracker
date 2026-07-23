@@ -94,11 +94,15 @@ public static class RegisterEndpoints
             return Results.Ok(initiatives.Select(i => InitiativeResponse.From(i, stageMap)).ToList());
         });
 
-        // GET /api/initiatives/{id} — the full initiative (FR-026). Readable by any authenticated role.
+        // GET /api/initiatives/{id} — the full initiative incl. stage history, NR lines, and update
+        // trail (FR-026; HAP-14 extends this to InitiativeDetailResponse — contracts/api.md "Register").
+        // Readable by any authenticated role (register data, not seam-gated); CanEdit is computed
+        // server-side via the SAME logic PUT enforces, so the UI can gate write controls without
+        // duplicating auth logic client-side.
         api.MapGet("/initiatives/{id:guid}", async (
-            Guid id, HttpContext http, HapDbContext db, CancellationToken ct) =>
+            Guid id, HttpContext http, HapDbContext db, HierarchyRoleResolver hierarchy, CancellationToken ct) =>
         {
-            if (!TryGetPersonId(http, out _))
+            if (!TryGetPersonId(http, out var callerId))
             {
                 return MissingPrincipal();
             }
@@ -110,7 +114,45 @@ public static class RegisterEndpoints
             }
 
             var stageMap = await StageMapAsync(db, ct);
-            return Results.Ok(InitiativeResponse.From(initiative, stageMap));
+            var canEdit = await CanEditAsync(callerId, initiative, db, hierarchy, ct);
+            // SingleOrDefaultAsync, not SingleAsync (panel finding, HAP-14): the initiative's
+            // CategoryId is not an enforced FK to HarrisCategories (see InitiativeConfiguration's
+            // comment on why owner/sponsor/creator go unenforced — category itself IS an FK here, but
+            // this guards the same class of "referenced row absent" surprise with a diagnostic 500
+            // instead of SingleAsync's opaque InvalidOperationException).
+            var categoryCustomerDeployedRaw = await db.HarrisCategories.AsNoTracking()
+                .Where(c => c.Id == initiative.CategoryId)
+                .Select(c => (bool?)c.CustomerDeployed)
+                .SingleOrDefaultAsync(ct);
+            if (categoryCustomerDeployedRaw is not bool categoryCustomerDeployed)
+            {
+                return Results.Problem(
+                    $"Initiative {id} references Harris category {initiative.CategoryId}, which no longer exists.",
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            var stageHistory = await db.InitiativeStageHistories.AsNoTracking()
+                .Where(h => h.InitiativeId == id)
+                .OrderBy(h => h.EnteredAt)
+                .Select(h => new StageHistoryEntryResponse(
+                    h.Id, h.Stage.ToString(), h.PriorStage == null ? null : h.PriorStage.ToString(), h.EnteredAt, h.EnteredBy))
+                .ToListAsync(ct);
+
+            var nrLines = await db.InitiativeNRLines.AsNoTracking()
+                .Where(l => l.InitiativeId == id)
+                .OrderBy(l => l.Year)
+                .Select(l => NrLineResponse.From(l))
+                .ToListAsync(ct);
+
+            // Newest-first per the AC ("update trail returned newest-first on the detail endpoint").
+            var updates = await db.InitiativeWeeklyUpdates.AsNoTracking()
+                .Where(u => u.InitiativeId == id)
+                .OrderByDescending(u => u.CreatedAt)
+                .Select(u => WeeklyUpdateResponse.From(u))
+                .ToListAsync(ct);
+
+            return Results.Ok(InitiativeDetailResponse.From(
+                initiative, stageMap, canEdit, categoryCustomerDeployed, stageHistory, nrLines, updates));
         });
 
         // POST /api/initiatives — Manager/BU Lead within own BU only (FR-034).
@@ -134,8 +176,10 @@ public static class RegisterEndpoints
                 return Results.Forbid();
             }
 
-            var categoryExists = await db.HarrisCategories.AnyAsync(c => c.Id == request.CategoryId, ct);
-            if (!categoryExists)
+            // Fetched as an entity (not AnyAsync) so CustomerDeployed drives the FR-031 gating below.
+            var category = await db.HarrisCategories.AsNoTracking()
+                .SingleOrDefaultAsync(c => c.Id == request.CategoryId, ct);
+            if (category is null)
             {
                 return Results.UnprocessableEntity(Problem("category", "Unknown Harris category."));
             }
@@ -165,10 +209,17 @@ public static class RegisterEndpoints
                     request.AiDlcLevel,
                     request.FunctionsAffected,
                     request.DimensionsAdvanced,
-                    request.CustomersInProduction,
+                    // FR-031: customers-in-production is only meaningful for customer-deployed
+                    // categories — a submitted value against a non-customer-deployed category is
+                    // silently normalised to null (data-integrity, not a validation failure).
+                    category.CustomerDeployed ? request.CustomersInProduction : null,
                     riskTier);
 
                 db.Initiatives.Add(initiative);
+                // HAP-14: every initiative's stage trail is complete from birth — the initial Idea row
+                // has no PriorStage (there is no "before").
+                db.InitiativeStageHistories.Add(
+                    InitiativeStageHistory.Create(initiative.Id, InitiativeStage.Idea, priorStage: null, callerId));
                 await db.SaveChangesAsync(ct);
 
                 var stageMap = await StageMapAsync(db, ct);
@@ -202,8 +253,10 @@ public static class RegisterEndpoints
                 return Results.NotFound();
             }
 
-            var categoryExists = await db.HarrisCategories.AnyAsync(c => c.Id == request.CategoryId, ct);
-            if (!categoryExists)
+            // Fetched as an entity (not AnyAsync) so CustomerDeployed drives the FR-031 gating below.
+            var category = await db.HarrisCategories.AsNoTracking()
+                .SingleOrDefaultAsync(c => c.Id == request.CategoryId, ct);
+            if (category is null)
             {
                 return Results.UnprocessableEntity(Problem("category", "Unknown Harris category."));
             }
@@ -220,6 +273,12 @@ public static class RegisterEndpoints
                     Problem("riskTier", $"Unrecognised risk tier '{request.RiskTier}'."));
             }
 
+            if (!TryParseDataSensitivity(request.DataSensitivity, out var dataSensitivity))
+            {
+                return Results.UnprocessableEntity(
+                    Problem("dataSensitivity", $"Unrecognised data sensitivity '{request.DataSensitivity}'."));
+            }
+
             try
             {
                 initiative.Edit(
@@ -231,8 +290,19 @@ public static class RegisterEndpoints
                     request.AiDlcLevel,
                     request.FunctionsAffected,
                     request.DimensionsAdvanced,
-                    request.CustomersInProduction,
-                    riskTier);
+                    // FR-031: same normalisation as POST — never persist a customer count against a
+                    // non-customer-deployed category, regardless of what was submitted.
+                    category.CustomerDeployed ? request.CustomersInProduction : null,
+                    riskTier,
+                    dataSensitivity,
+                    request.RegulatoryRelevance,
+                    request.ApprovalStatus,
+                    request.Approver,
+                    request.OversightModel,
+                    request.GovernanceNotes,
+                    request.ModelsProviders,
+                    request.VendorsTools,
+                    request.UsesCogito);
 
                 await db.SaveChangesAsync(ct);
 
@@ -243,6 +313,202 @@ public static class RegisterEndpoints
             {
                 return Results.UnprocessableEntity(Problem("initiative", ex.Message));
             }
+        });
+
+        // POST /api/initiatives/{id}/stage — forward-only transition (FR-028); same edit permission as
+        // PUT (404 existence-leak convention); 409 on backward/no-op/Retired-is-terminal.
+        api.MapPost("/initiatives/{id:guid}/stage", async (
+            Guid id, StageChangeRequest request, HttpContext http, HapDbContext db, HierarchyRoleResolver hierarchy, CancellationToken ct) =>
+        {
+            if (!TryGetPersonId(http, out var callerId))
+            {
+                return MissingPrincipal();
+            }
+
+            var initiative = await db.Initiatives.SingleOrDefaultAsync(i => i.Id == id, ct);
+            if (initiative is null)
+            {
+                return Results.NotFound();
+            }
+
+            var canEdit = await CanEditAsync(callerId, initiative, db, hierarchy, ct);
+            if (!canEdit)
+            {
+                return Results.NotFound();
+            }
+
+            if (!TryParseStage(request.Stage, out var target))
+            {
+                return Results.UnprocessableEntity(Problem("stage", $"Unrecognised stage '{request.Stage}'."));
+            }
+
+            try
+            {
+                var priorStage = initiative.AdvanceStage(target);
+                db.InitiativeStageHistories.Add(
+                    InitiativeStageHistory.Create(initiative.Id, target, priorStage, callerId));
+                await db.SaveChangesAsync(ct);
+
+                var stageMap = await StageMapAsync(db, ct);
+                return Results.Ok(InitiativeResponse.From(initiative, stageMap));
+            }
+            catch (InitiativeStageTransitionException)
+            {
+                return Results.Conflict();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another transition on this initiative committed first (xmin moved) between our read
+                // and our write — the loser's save rolls back and gets the same 409 semantics as any
+                // other stage-transition conflict (panel finding, HAP-14; see InitiativeConfiguration's
+                // xmin comment).
+                return Results.Conflict();
+            }
+        });
+
+        // POST /api/initiatives/{id}/updates — weekly RAG + note (FR-033); same edit permission as PUT.
+        api.MapPost("/initiatives/{id:guid}/updates", async (
+            Guid id, PostWeeklyUpdateRequest request, HttpContext http, HapDbContext db, HierarchyRoleResolver hierarchy, CancellationToken ct) =>
+        {
+            if (!TryGetPersonId(http, out var callerId))
+            {
+                return MissingPrincipal();
+            }
+
+            var initiative = await db.Initiatives.SingleOrDefaultAsync(i => i.Id == id, ct);
+            if (initiative is null)
+            {
+                return Results.NotFound();
+            }
+
+            var canEdit = await CanEditAsync(callerId, initiative, db, hierarchy, ct);
+            if (!canEdit)
+            {
+                return Results.NotFound();
+            }
+
+            if (!TryParseRagStatus(request.RagStatus, out var rag))
+            {
+                return Results.UnprocessableEntity(Problem("ragStatus", $"Unrecognised RAG status '{request.RagStatus}'."));
+            }
+
+            try
+            {
+                // FR-031 gating (same rule as POST/PUT): a submitted customer count only applies for
+                // customer-deployed categories — otherwise it is silently ignored (not 422; mirrors how
+                // Edit already treats this field permissively).
+                if (request.CustomersInProduction is not null)
+                {
+                    var categoryDeployed = await db.HarrisCategories.AsNoTracking()
+                        .Where(c => c.Id == initiative.CategoryId)
+                        .Select(c => c.CustomerDeployed)
+                        .SingleAsync(ct);
+                    if (categoryDeployed)
+                    {
+                        initiative.SetCustomersInProduction(request.CustomersInProduction);
+                    }
+                }
+
+                // Single instant for both writes (panel finding, HAP-14): LastUpdateAt and the row's
+                // CreatedAt must agree — they record the same logical event.
+                var now = DateTime.UtcNow;
+                initiative.PostWeeklyUpdate(rag, now);
+                var update = InitiativeWeeklyUpdate.Create(initiative.Id, rag, request.Note, callerId, now);
+                db.InitiativeWeeklyUpdates.Add(update);
+                await db.SaveChangesAsync(ct);
+
+                return Results.Created(
+                    $"/api/initiatives/{initiative.Id}", WeeklyUpdateResponse.From(update));
+            }
+            catch (InitiativeValidationException ex)
+            {
+                return Results.UnprocessableEntity(Problem("customersInProduction", ex.Message));
+            }
+        });
+
+        // POST /api/initiatives/{id}/nr-lines — add an NR capture line (FR-029); same edit permission.
+        api.MapPost("/initiatives/{id:guid}/nr-lines", async (
+            Guid id, CreateNrLineRequest request, HttpContext http, HapDbContext db, HierarchyRoleResolver hierarchy, CancellationToken ct) =>
+        {
+            if (!TryGetPersonId(http, out var callerId))
+            {
+                return MissingPrincipal();
+            }
+
+            var initiative = await db.Initiatives.AsNoTracking().SingleOrDefaultAsync(i => i.Id == id, ct);
+            if (initiative is null)
+            {
+                return Results.NotFound();
+            }
+
+            var canEdit = await CanEditAsync(callerId, initiative, db, hierarchy, ct);
+            if (!canEdit)
+            {
+                return Results.NotFound();
+            }
+
+            if (!TryParseNRDirection(request.Direction, out var direction))
+            {
+                return Results.UnprocessableEntity(Problem("direction", $"Unrecognised NR direction '{request.Direction}'."));
+            }
+            if (!TryParseNRRecurrence(request.Recurrence, out var recurrence))
+            {
+                return Results.UnprocessableEntity(Problem("recurrence", $"Unrecognised NR recurrence '{request.Recurrence}'."));
+            }
+
+            try
+            {
+                var line = InitiativeNRLine.Create(
+                    id, request.Year, direction, recurrence, request.AmountUsd, request.Description);
+                db.InitiativeNRLines.Add(line);
+                await db.SaveChangesAsync(ct);
+                return Results.Created($"/api/initiatives/{id}/nr-lines/{line.Id}", NrLineResponse.From(line));
+            }
+            catch (InitiativeValidationException ex)
+            {
+                return Results.UnprocessableEntity(Problem("nrLine", ex.Message));
+            }
+        });
+
+        // DELETE /api/initiatives/{id}/nr-lines/{lineId} — editable until referenced by a persisted
+        // Harris submission line, then 409 (reconciliation integrity; HAP-16 stub — see
+        // InitiativeNRLine.MarkReferencedBySubmission). Same edit permission as PUT.
+        api.MapDelete("/initiatives/{id:guid}/nr-lines/{lineId:guid}", async (
+            Guid id, Guid lineId, HttpContext http, HapDbContext db, HierarchyRoleResolver hierarchy, CancellationToken ct) =>
+        {
+            if (!TryGetPersonId(http, out var callerId))
+            {
+                return MissingPrincipal();
+            }
+
+            var initiative = await db.Initiatives.AsNoTracking().SingleOrDefaultAsync(i => i.Id == id, ct);
+            if (initiative is null)
+            {
+                return Results.NotFound();
+            }
+
+            var canEdit = await CanEditAsync(callerId, initiative, db, hierarchy, ct);
+            if (!canEdit)
+            {
+                return Results.NotFound();
+            }
+
+            // Not found, OR belongs to a different initiative — both 404 (no existence leak across
+            // initiatives, matching the class-wide convention).
+            var line = await db.InitiativeNRLines.SingleOrDefaultAsync(l => l.Id == lineId && l.InitiativeId == id, ct);
+            if (line is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (line.ReferencedBySubmissionLineId is not null)
+            {
+                return Results.Conflict();
+            }
+
+            db.InitiativeNRLines.Remove(line);
+            await db.SaveChangesAsync(ct);
+            return Results.NoContent();
         });
 
         // GET /api/harris-categories — reference data for the register filters + create/edit form
@@ -410,6 +676,68 @@ public static class RegisterEndpoints
         return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
     }
 
+    /// <summary>Parses <see cref="DataSensitivity"/> from the wire (FR-030 governance field). Same
+    /// null/blank-defaults-to-lowest-value convention as <see cref="TryParseRiskTier"/> (an omitted
+    /// sensitivity is a valid "None" default), with the same <see cref="Enum.IsDefined(Type,object)"/>
+    /// belt-and-braces check against the numeric-string gap.</summary>
+    private static bool TryParseDataSensitivity(string? raw, out DataSensitivity value)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            value = DataSensitivity.None;
+            return true;
+        }
+        return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
+    }
+
+    /// <summary>Parses <see cref="InitiativeStage"/> from the wire (FR-028 stage-transition target).
+    /// Unlike <see cref="TryParseRiskTier"/>/<see cref="TryParseDataSensitivity"/> there is no valid
+    /// default for an omitted stage — a stage-change request MUST name a target stage, so blank fails
+    /// just like an unrecognised value.</summary>
+    private static bool TryParseStage(string? raw, out InitiativeStage value)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            value = default;
+            return false;
+        }
+        return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
+    }
+
+    /// <summary>Parses <see cref="RagStatus"/> from the wire (FR-033 weekly update). No valid default
+    /// for an omitted value — every weekly update names an explicit RAG status.</summary>
+    private static bool TryParseRagStatus(string? raw, out RagStatus value)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            value = default;
+            return false;
+        }
+        return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
+    }
+
+    /// <summary>Parses <see cref="NRDirection"/> from the wire (FR-029 NR line). No valid default.</summary>
+    private static bool TryParseNRDirection(string? raw, out NRDirection value)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            value = default;
+            return false;
+        }
+        return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
+    }
+
+    /// <summary>Parses <see cref="NRRecurrence"/> from the wire (FR-029 NR line). No valid default.</summary>
+    private static bool TryParseNRRecurrence(string? raw, out NRRecurrence value)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            value = default;
+            return false;
+        }
+        return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
+    }
+
     private static bool TryGetPersonId(HttpContext http, out Guid personId) =>
         Guid.TryParse(http.User.FindFirstValue("person_id"), out personId);
 
@@ -437,7 +765,9 @@ public sealed record CreateInitiativeRequest(
 
 /// <summary>Body of PUT /api/initiatives/{id}. Editable fields only — business_unit_id and current_stage
 /// are deliberately absent (BU reassignment is out of scope; stage change is HAP-14's forward-only
-/// endpoint).</summary>
+/// endpoint). HAP-14 appends the governance (FR-030, informational only — §4.2) and technology (FR-032)
+/// fields; every one is optional / defaults to empty so a caller that predates this story's UI still
+/// round-trips cleanly.</summary>
 public sealed record UpdateInitiativeRequest(
     string Name,
     string? Description,
@@ -448,7 +778,30 @@ public sealed record UpdateInitiativeRequest(
     IReadOnlyList<string>? FunctionsAffected,
     IReadOnlyList<string>? DimensionsAdvanced,
     int? CustomersInProduction,
-    string? RiskTier);
+    string? RiskTier,
+    string? DataSensitivity = null,
+    IReadOnlyList<string>? RegulatoryRelevance = null,
+    string? ApprovalStatus = null,
+    string? Approver = null,
+    string? OversightModel = null,
+    string? GovernanceNotes = null,
+    IReadOnlyList<string>? ModelsProviders = null,
+    IReadOnlyList<string>? VendorsTools = null,
+    bool UsesCogito = false);
+
+/// <summary>Body of POST /api/initiatives/{id}/stage (FR-028) — the forward-only transition target.
+/// There is deliberately no per-transition note/reason field: a correction is a new forward transition,
+/// and the AC's own worked examples (contracts/api.md "Register") carry no such field.</summary>
+public sealed record StageChangeRequest(string Stage);
+
+/// <summary>Body of POST /api/initiatives/{id}/updates (FR-033) — RAG + optional one-line note,
+/// designed for &lt;1 minute entry. <see cref="CustomersInProduction"/> only applies when the
+/// initiative's category is customer-deployed (FR-031); otherwise it is silently ignored.</summary>
+public sealed record PostWeeklyUpdateRequest(string RagStatus, string? Note, int? CustomersInProduction);
+
+/// <summary>Body of POST /api/initiatives/{id}/nr-lines (FR-029).</summary>
+public sealed record CreateNrLineRequest(
+    int Year, string Direction, string Recurrence, decimal AmountUsd, string? Description);
 
 /// <summary>Wire shape of one Harris category (FR-027), for filter dropdowns and the create/edit form.</summary>
 public sealed record HarrisCategoryResponse(Guid Id, string Key, string Name, bool GroupReported, bool CustomerDeployed);
@@ -500,4 +853,115 @@ public sealed record InitiativeResponse(
             i.LastUpdateAt,
             i.CustomersInProduction,
             i.RiskTier.ToString());
+}
+
+/// <summary>Wire shape of one stage-history entry (data-model.md "InitiativeStageHistory"; FR-028).
+/// <see cref="PriorStage"/> is null only for the initial Idea row written at creation.</summary>
+public sealed record StageHistoryEntryResponse(Guid Id, string Stage, string? PriorStage, DateTime EnteredAt, Guid EnteredBy);
+
+/// <summary>Wire shape of one NR capture line (FR-029). <see cref="Locked"/> mirrors
+/// <c>ReferencedBySubmissionLineId != null</c> — always false on creation (HAP-16 stub; see
+/// <c>InitiativeNRLine</c>'s class doc), true once a Harris submission has referenced the line.</summary>
+public sealed record NrLineResponse(
+    Guid Id, int Year, string Direction, string Recurrence, decimal AmountUsd, string? Description, bool Locked)
+{
+    public static NrLineResponse From(InitiativeNRLine l) =>
+        new(l.Id, l.Year, l.Direction.ToString(), l.Recurrence.ToString(), l.AmountUsd, l.Description,
+            l.ReferencedBySubmissionLineId is not null);
+}
+
+/// <summary>Wire shape of one weekly update entry (FR-033).</summary>
+public sealed record WeeklyUpdateResponse(Guid Id, string RagStatus, string? Note, Guid CreatedBy, DateTime CreatedAt)
+{
+    public static WeeklyUpdateResponse From(InitiativeWeeklyUpdate u) =>
+        new(u.Id, u.RagStatus.ToString(), u.Note, u.CreatedBy, u.CreatedAt);
+}
+
+/// <summary>
+/// Full detail shape of GET /api/initiatives/{id} (HAP-14; contracts/api.md "Register"). Everything
+/// <see cref="InitiativeResponse"/> has, PLUS the governance/technology scalar fields (FR-030/FR-032),
+/// PLUS the server-computed <see cref="CanEdit"/> (same logic PUT enforces — lets the UI gate write
+/// controls without duplicating auth logic client-side), <see cref="CategoryCustomerDeployed"/> (drives
+/// whether the UI shows the customers-in-production field, FR-031), the stage timeline (oldest→newest),
+/// the NR lines, and the update trail (newest-first — AC requirement, FR-033).
+///
+/// <para>Deliberately a SEPARATE record from <see cref="InitiativeResponse"/> (not an extension of it) —
+/// the list/create/update endpoints keep the lighter shape; only the single-entity detail read pays for
+/// the joined governance/history/lines/updates data.</para>
+/// </summary>
+public sealed record InitiativeDetailResponse(
+    Guid Id,
+    Guid BusinessUnitId,
+    string Name,
+    string? Description,
+    Guid? SponsorPersonId,
+    Guid OwnerPersonId,
+    Guid CreatedByPersonId,
+    DateTime RegisteredAt,
+    Guid CategoryId,
+    int AiDlcLevel,
+    IReadOnlyList<string> FunctionsAffected,
+    IReadOnlyList<string> DimensionsAdvanced,
+    string CurrentStage,
+    string? HarrisStage,
+    string RagStatus,
+    DateTime LastUpdateAt,
+    int? CustomersInProduction,
+    string RiskTier,
+    string DataSensitivity,
+    IReadOnlyList<string> RegulatoryRelevance,
+    string? ApprovalStatus,
+    string? Approver,
+    string? OversightModel,
+    string? GovernanceNotes,
+    IReadOnlyList<string> ModelsProviders,
+    IReadOnlyList<string> VendorsTools,
+    bool UsesCogito,
+    bool CanEdit,
+    bool CategoryCustomerDeployed,
+    IReadOnlyList<StageHistoryEntryResponse> StageHistory,
+    IReadOnlyList<NrLineResponse> NrLines,
+    IReadOnlyList<WeeklyUpdateResponse> Updates)
+{
+    public static InitiativeDetailResponse From(
+        Initiative i,
+        IReadOnlyDictionary<InitiativeStage, HarrisStage> stageMap,
+        bool canEdit,
+        bool categoryCustomerDeployed,
+        IReadOnlyList<StageHistoryEntryResponse> stageHistory,
+        IReadOnlyList<NrLineResponse> nrLines,
+        IReadOnlyList<WeeklyUpdateResponse> updates) =>
+        new(
+            i.Id,
+            i.BusinessUnitId,
+            i.Name,
+            i.Description,
+            i.SponsorPersonId,
+            i.OwnerPersonId,
+            i.CreatedByPersonId,
+            i.RegisteredAt,
+            i.CategoryId,
+            i.AiDlcLevel,
+            i.FunctionsAffected,
+            i.DimensionsAdvanced,
+            i.CurrentStage.ToString(),
+            stageMap.TryGetValue(i.CurrentStage, out var harris) ? harris.ToString() : null,
+            i.RagStatus.ToString(),
+            i.LastUpdateAt,
+            i.CustomersInProduction,
+            i.RiskTier.ToString(),
+            i.DataSensitivity.ToString(),
+            i.RegulatoryRelevance,
+            i.ApprovalStatus,
+            i.Approver,
+            i.OversightModel,
+            i.GovernanceNotes,
+            i.ModelsProviders,
+            i.VendorsTools,
+            i.UsesCogito,
+            canEdit,
+            categoryCustomerDeployed,
+            stageHistory,
+            nrLines,
+            updates);
 }

@@ -3,11 +3,12 @@ import type { MouseEvent } from 'react';
 import { AssessmentModerationScreen } from '../screens/assessment-moderation/AssessmentModerationScreen';
 import { AssessmentSelfScreen } from '../screens/assessment-self/AssessmentSelfScreen';
 import { DashboardScreen } from '../screens/dashboard-bu/DashboardScreen';
+import { RegisterDetailScreen } from '../screens/register-detail/RegisterDetailScreen';
 import { RegisterListScreen } from '../screens/register-list/RegisterListScreen';
 import { fetchMe, signOut, type MeResponse } from '../api/client';
 import { strings } from '../strings';
 
-type View = 'dashboard' | 'self' | 'moderation' | 'register';
+type View = 'dashboard' | 'self' | 'moderation' | 'register' | 'register-detail';
 
 interface NavEntry {
   label: string;
@@ -71,6 +72,10 @@ interface AppShellProps {
 export function AppShell({ onSignedOut }: AppShellProps): JSX.Element {
   const [view, setView] = useState<View>('self');
   const [me, setMe] = useState<MeResponse | null>(null);
+  // HAP-14: which initiative the register-detail screen shows — set when a register row is opened,
+  // cleared implicitly by leaving the view (RegisterListScreen owns the list; this shell just tracks
+  // the single selected id, same plain-useState pattern as `view` itself).
+  const [selectedInitiativeId, setSelectedInitiativeId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +148,17 @@ export function AppShell({ onSignedOut }: AppShellProps): JSX.Element {
           {view === 'dashboard' && <DashboardScreen onStartSelfAssessment={() => setView('self')} />}
           {view === 'self' && <AssessmentSelfScreen />}
           {view === 'moderation' && <AssessmentModerationScreen />}
-          {view === 'register' && <RegisterListScreen />}
+          {view === 'register' && (
+            <RegisterListScreen
+              onOpenInitiative={(id) => {
+                setSelectedInitiativeId(id);
+                setView('register-detail');
+              }}
+            />
+          )}
+          {view === 'register-detail' && selectedInitiativeId && (
+            <RegisterDetailScreen initiativeId={selectedInitiativeId} onBack={() => setView('register')} />
+          )}
         </main>
       </div>
     </div>

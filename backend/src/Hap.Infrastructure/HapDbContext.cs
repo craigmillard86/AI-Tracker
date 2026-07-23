@@ -15,7 +15,12 @@ namespace Hap.Infrastructure;
 /// chains behind that with the assessment tables (data-model.md's assessment + score entities) —
 /// mapped via <c>ApplyConfiguration</c> (see <c>Persistence.AssessmentConfiguration</c>) rather than
 /// inline here, and deliberately WITHOUT a public DbSet: those tables are queried only through the
-/// visibility seam's store (research D1). Later stories chain forward-only migrations behind this one.
+/// visibility seam's store (research D1). Migration #5 (HAP-10) adds the rollup snapshot table. Migration
+/// #6 (HAP-13) adds the initiative register (Initiative/HarrisCategory/HarrisStageMap). Migration #7
+/// (HAP-14) chains behind that with initiative detail tracking (InitiativeStageHistory/
+/// InitiativeWeeklyUpdate/InitiativeNRLine — FR-028/FR-029/FR-033) and extends the initiatives table with
+/// the governance/technology panels (FR-030/FR-032). Later stories chain forward-only migrations behind
+/// this one.
 ///
 /// Note the deliberate asymmetry on <see cref="AuditLogs"/>: the entity is immutable (no
 /// setters) and no code path calls Update/Remove on this set — enforced by
@@ -51,6 +56,13 @@ public class HapDbContext : DbContext
     public DbSet<Domain.Register.Initiative> Initiatives => Set<Domain.Register.Initiative>();
     public DbSet<Domain.Register.HarrisCategory> HarrisCategories => Set<Domain.Register.HarrisCategory>();
     public DbSet<Domain.Register.HarrisStageMap> HarrisStageMaps => Set<Domain.Register.HarrisStageMap>();
+
+    // Initiative detail tracking (HAP-14, migration #7) — register data, public DbSets, same rule as
+    // above. Stage history and weekly updates are append-only; NR lines are deletable until locked by a
+    // persisted Harris submission (see InitiativeNRLine's class doc).
+    public DbSet<Domain.Register.InitiativeStageHistory> InitiativeStageHistories => Set<Domain.Register.InitiativeStageHistory>();
+    public DbSet<Domain.Register.InitiativeWeeklyUpdate> InitiativeWeeklyUpdates => Set<Domain.Register.InitiativeWeeklyUpdate>();
+    public DbSet<Domain.Register.InitiativeNRLine> InitiativeNRLines => Set<Domain.Register.InitiativeNRLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -274,5 +286,10 @@ public class HapDbContext : DbContext
         modelBuilder.ApplyConfiguration(new Persistence.HarrisCategoryConfiguration());
         modelBuilder.ApplyConfiguration(new Persistence.HarrisStageMapConfiguration());
         modelBuilder.ApplyConfiguration(new Persistence.InitiativeConfiguration());
+
+        // Initiative detail tracking (HAP-14, migration #7) — register data with public DbSets.
+        modelBuilder.ApplyConfiguration(new Persistence.InitiativeStageHistoryConfiguration());
+        modelBuilder.ApplyConfiguration(new Persistence.InitiativeWeeklyUpdateConfiguration());
+        modelBuilder.ApplyConfiguration(new Persistence.InitiativeNRLineConfiguration());
     }
 }

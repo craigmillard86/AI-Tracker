@@ -1,0 +1,374 @@
+/* RegisterDetailScreen — DESIGN.md A6 layout; IA per docs/design/mockups/register-detail.html
+   (binding). Built exclusively from tokens.css; no new colours, radii, shadows, or type sizes. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.register-detail-status {
+  margin: var(--space-md) 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.register-detail-status-error {
+  color: var(--color-feedback-error);
+}
+
+.register-detail-status-success {
+  color: var(--color-feedback-success);
+}
+
+.register-detail-notfound {
+  padding: var(--space-lg) 0;
+}
+
+/* Header. */
+.register-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.register-detail-crumb {
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-sm);
+}
+
+.register-detail-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--type-page-title-size);
+  line-height: var(--type-page-title-line);
+  font-weight: var(--type-page-title-weight);
+  color: var(--color-page-black);
+}
+
+.register-detail-subtitle {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.register-detail-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex: none;
+}
+
+.register-detail-btn {
+  font-family: var(--font-family-ui);
+  font-weight: var(--type-button-weight);
+  font-size: var(--type-button-size);
+  border-radius: var(--radius-pill);
+  height: 40px;
+  padding: 0 var(--space-lg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.register-detail-btn-primary {
+  background: var(--color-brand-teal);
+  color: var(--color-pure-white);
+  border: 1.5px solid transparent;
+}
+
+.register-detail-btn-primary:hover:not(:disabled) {
+  background: var(--color-feedback-info);
+}
+
+.register-detail-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.register-detail-btn-secondary {
+  background: var(--color-pure-white);
+  color: var(--color-brand-teal);
+  border: 1.5px solid var(--color-brand-teal);
+}
+
+.register-detail-btn-secondary:hover {
+  background: var(--color-light-gray-surface);
+}
+
+.register-detail-btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Layout. */
+.register-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  align-items: start;
+  gap: var(--space-lg);
+}
+
+.register-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md-lg);
+}
+
+.register-detail-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md-lg);
+  position: sticky;
+  top: var(--space-md-lg);
+}
+
+.register-detail-card {
+  background: var(--color-pure-white);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md-lg) var(--space-lg);
+}
+
+.register-detail-card h2 {
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+  margin: 0 0 var(--space-xs);
+}
+
+.register-detail-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.register-detail-hint {
+  margin: 0;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+}
+
+.register-detail-hint-spaced {
+  margin-bottom: var(--space-md);
+}
+
+.register-detail-chips {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex: none;
+}
+
+/* Identity/tech card fields. */
+.register-detail-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--space-xl);
+}
+
+.register-detail-label {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-xs);
+}
+
+.register-detail-value {
+  font-size: var(--type-body-size);
+  color: var(--color-page-black);
+  margin: 0 0 var(--space-md);
+}
+
+.register-detail-muted {
+  color: var(--color-mid-gray-text);
+  font-size: var(--type-table-cell-size);
+}
+
+.register-detail-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-slate-text);
+  background: var(--color-light-gray-surface);
+  border: 1px solid var(--color-border-gray);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  margin: 0 var(--space-xs) var(--space-xs) 0;
+}
+
+/* Governance & risk table. */
+.register-detail-gov-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-table-cell-size);
+}
+
+.register-detail-gov-table td {
+  padding: var(--space-sm) var(--space-md-sm);
+  border-bottom: 1px solid var(--color-light-gray-surface);
+  vertical-align: middle;
+}
+
+.register-detail-gov-table td:first-child {
+  width: 230px;
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+}
+
+/* Generic status chip reused for governance rows (no dedicated component in DESIGN.md A8 — see the
+   screen's `governanceVariant` comment). Same tinted-pill visual language as RagChip. */
+.gov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+}
+
+.gov-chip-green {
+  background: var(--color-rag-green-tint);
+  color: var(--color-rag-green);
+}
+
+.gov-chip-amber {
+  background: var(--color-rag-amber-tint);
+  color: var(--color-rag-amber);
+}
+
+.gov-chip-red {
+  background: var(--color-rag-red-tint);
+  color: var(--color-rag-red);
+}
+
+/* Weekly-update composer. */
+.register-detail-callout {
+  border: 1px solid var(--color-rag-red);
+  background: var(--color-rag-red-tint);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--type-table-cell-size);
+  color: var(--color-rag-red);
+  margin-bottom: var(--space-md);
+}
+
+.register-detail-rag-group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-md);
+}
+
+.register-detail-field-label {
+  display: block;
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-sm);
+}
+
+.register-detail-rag-options {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.register-detail-rag-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-slate-text);
+  background: var(--color-ice-blue-surface);
+  border-radius: var(--radius-pill);
+  padding: 7px var(--space-md);
+  cursor: pointer;
+}
+
+.register-detail-rag-option-selected {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}
+
+.register-detail-field {
+  display: block;
+  margin-bottom: var(--space-md);
+}
+
+.register-detail-field > span {
+  display: block;
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-xs);
+}
+
+.register-detail-input {
+  width: 100%;
+  font-family: var(--font-family-ui);
+  font-size: var(--type-body-size);
+  color: var(--color-page-black);
+  border: 1px solid var(--color-border-gray);
+  border-radius: var(--radius-input);
+  padding: 9px var(--space-md-sm);
+  background: var(--color-pure-white);
+}
+
+textarea.register-detail-input {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.register-detail-input:focus {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 0;
+  border-color: var(--color-brand-teal);
+}
+
+/* Recent-updates feed. */
+.register-detail-updates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.register-detail-update-row {
+  border-top: 1px solid var(--color-light-gray-surface);
+  padding: var(--space-sm) 0;
+}
+
+.register-detail-update-row:first-child {
+  border-top: 0;
+}
+
+.register-detail-update-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.register-detail-update-note {
+  margin: 0;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-slate-text);
+}

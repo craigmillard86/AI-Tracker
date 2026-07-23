@@ -536,3 +536,135 @@ export async function fetchInitiatives(query: InitiativeQuery = {}): Promise<Ini
   }
   return (await response.json()) as InitiativeResponse[];
 }
+
+/**
+ * Initiative detail endpoints (HAP-14; FR-028). The detail screen (stage history, NR capture,
+ * governance & risk, weekly-update composer) reads/writes through these. Types mirror the API's
+ * camelCase response shapes exactly. `dataSensitivity`/`regulatoryRelevance`/etc. are the caller's
+ * governance-and-risk fields (informational only, §4.2 — registering an initiative confers no
+ * approval); `canEdit` is the caller's write authority for THIS initiative and gates every write
+ * control the screen renders.
+ */
+
+export interface StageHistoryEntry {
+  id: string;
+  stage: InitiativeStage;
+  priorStage: InitiativeStage | null;
+  enteredAt: string;
+  enteredBy: string;
+}
+
+export interface NrLine {
+  id: string;
+  year: number;
+  direction: 'Direct' | 'Indirect';
+  recurrence: 'OneTime' | 'Recurring';
+  amountUsd: number;
+  description: string | null;
+  locked: boolean;
+}
+
+export interface WeeklyUpdate {
+  id: string;
+  ragStatus: RagStatus;
+  note: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface InitiativeDetailResponse extends InitiativeResponse {
+  dataSensitivity: 'None' | 'Internal' | 'PII' | 'PHI' | 'Clinical';
+  regulatoryRelevance: string[];
+  approvalStatus: string | null;
+  approver: string | null;
+  oversightModel: string | null;
+  governanceNotes: string | null;
+  modelsProviders: string[];
+  vendorsTools: string[];
+  usesCogito: boolean;
+  /** Caller's write authority for THIS initiative — gate every write control on this. */
+  canEdit: boolean;
+  /** Whether "customers in production" is applicable for this initiative's Harris category. */
+  categoryCustomerDeployed: boolean;
+  /** Oldest -> newest. */
+  stageHistory: StageHistoryEntry[];
+  nrLines: NrLine[];
+  /** Newest -> oldest. */
+  updates: WeeklyUpdate[];
+}
+
+/** POST /api/initiatives/{id}/updates body. */
+export interface WeeklyUpdateRequest {
+  ragStatus: RagStatus;
+  note?: string;
+  customersInProduction?: number;
+}
+
+/** POST /api/initiatives/{id}/nr-lines body. */
+export interface NrLineRequest {
+  year: number;
+  direction: 'Direct' | 'Indirect';
+  recurrence: 'OneTime' | 'Recurring';
+  amountUsd: number;
+  description?: string;
+}
+
+/** Thrown by the initiative detail write calls with the response's HTTP status so the caller can map
+ * it to the right inline message (404 no edit rights, 409 locked NR line, 422 bad input). */
+export class InitiativeWriteError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`initiative write failed (${status})`);
+    this.status = status;
+  }
+}
+
+/** GET /api/initiatives/{id}. Returns null on a 404 (not found — this is a plain not-found state
+ * for a register read, not an authorisation failure; the register is not seam-gated). */
+export async function fetchInitiativeDetail(id: string): Promise<InitiativeDetailResponse | null> {
+  const response = await fetch(`/api/initiatives/${id}`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/initiatives/${id} failed (${response.status})`);
+  }
+  return (await response.json()) as InitiativeDetailResponse;
+}
+
+/** POST /api/initiatives/{id}/updates — post a weekly RAG/note check-in. */
+export async function postWeeklyUpdate(id: string, body: WeeklyUpdateRequest): Promise<WeeklyUpdate> {
+  const response = await fetch(`/api/initiatives/${id}/updates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status !== 201) {
+    throw new InitiativeWriteError(response.status);
+  }
+  return (await response.json()) as WeeklyUpdate;
+}
+
+/** POST /api/initiatives/{id}/nr-lines — add an NR capture line. */
+export async function createNrLine(id: string, body: NrLineRequest): Promise<NrLine> {
+  const response = await fetch(`/api/initiatives/${id}/nr-lines`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status !== 201) {
+    throw new InitiativeWriteError(response.status);
+  }
+  return (await response.json()) as NrLine;
+}
+
+/** DELETE /api/initiatives/{id}/nr-lines/{lineId} — 409 when the line is locked (submission-referenced). */
+export async function deleteNrLine(id: string, lineId: string): Promise<void> {
+  const response = await fetch(`/api/initiatives/${id}/nr-lines/${lineId}`, {
+    method: 'DELETE',
+  });
+  if (response.status !== 204) {
+    throw new InitiativeWriteError(response.status);
+  }
+}

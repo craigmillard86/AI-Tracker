@@ -50,3 +50,33 @@ public enum RiskTier
     Med,
     High,
 }
+
+/// <summary>An NR line's direction (FR-029 value capture; data-model.md "InitiativeNRLine"): whether
+/// the initiative's net revenue impact is realised directly by the initiative itself, or indirectly
+/// (e.g. cost avoidance that flows through another line of business).</summary>
+public enum NRDirection
+{
+    Direct,
+    Indirect,
+}
+
+/// <summary>An NR line's recurrence (FR-029): a single one-off figure, or a recurring (e.g. annualised)
+/// figure.</summary>
+public enum NRRecurrence
+{
+    OneTime,
+    Recurring,
+}
+
+/// <summary>The sensitivity of data an initiative touches (FR-030 governance — informational only, §4.2:
+/// the register is not an approval gate). Ordered least→most sensitive; the ordering carries no
+/// behavioural meaning in this build (no threshold logic reads it), it only affects the seeded UI
+/// select's option order.</summary>
+public enum DataSensitivity
+{
+    None,
+    Internal,
+    PII,
+    PHI,
+    Clinical,
+}

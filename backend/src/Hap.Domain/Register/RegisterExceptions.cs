@@ -9,3 +9,13 @@ public sealed class InitiativeValidationException : Exception
     {
     }
 }
+
+/// <summary>An initiative stage transition was attempted backward, as a same-stage no-op, or from the
+/// terminal <see cref="InitiativeStage.Retired"/> stage (FR-028 — forward-only; Retired is terminal).
+/// Maps to 409 at the API (contracts/api.md "Register").</summary>
+public sealed class InitiativeStageTransitionException : Exception
+{
+    public InitiativeStageTransitionException(string message) : base(message)
+    {
+    }
+}
