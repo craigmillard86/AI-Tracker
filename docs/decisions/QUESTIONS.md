@@ -632,3 +632,13 @@ Found in owner acceptance testing: a plain individual contributor (no direct rep
 **Provisional answer in effect (per CLAUDE.md §6.3):** unchanged — ICs get their own-team summary, suppressed under 4; no relabel. Privacy-safe as-is.
 **Owner action:** rule on (a) relabel a member's own-team view (drop the manager's name), and (b) whether ICs should see a team dashboard at all (keep / remove the nav entry for ICs). Either is an L1 shell/HAP-11 tweak; neither is a privacy defect.
 **Status:** OPEN (provisional in effect)
+
+## 2026-07-23 · HAP-14 (L2 domain panel) · Q-029 — "Stale" (list) vs "Overdue" (detail): should the register-list stale-flag be stage-aware?
+
+Raised by the HAP-14 domain review. HAP-14 correctly stage-gates the register-**detail** "Overdue Update" banner to active stages only (Evaluation→Scaled; Idea/Retired exempt, per root spec §4.2 + data-model.md `InitiativeWeeklyUpdate`). But HAP-13's register-**list** `StaleRowFlag` (amber >7d / red >14d off `last_update_at`) is **not** stage-gated — so an Idea-stage initiative untouched for 8 days shows an amber "stale" flag on the list while its detail page shows **no** overdue banner.
+
+These are arguably **two different concepts** and the divergence may be correct as-is: *staleness* = "this record's data is old" (meaningful at any stage — even an Idea entry can have gone quiet), whereas *overdue* = "this active initiative missed its required weekly update" (a §4.2 compliance signal that genuinely doesn't apply to Idea/Retired). The two mockups (register-list.html vs register-detail.html) show them as distinct affordances. So this is a **product/labelling question, not a defect** — nothing leaks, no reconciliation rule is broken.
+
+**Provisional answer in effect (per CLAUDE.md §6.3):** leave as-is — StaleRowFlag stays a stage-agnostic data-freshness indicator; the overdue banner is the stage-gated compliance signal. No change to HAP-13.
+**Owner action:** rule on whether that split is intended, or whether the list stale-flag should ALSO be stage-aware (suppress/soften for Idea/Retired) so the two screens tell one story. Either way it's an L1 register-list tweak; not a privacy or reconciliation issue.
+**Status:** OPEN (provisional in effect)
