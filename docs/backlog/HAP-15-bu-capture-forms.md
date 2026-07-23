@@ -5,7 +5,7 @@ epic: E4-harris
 wave: 2
 fr: [FR-047, FR-048]
 risk: L2                # trigger: EF migrations/schema (evidence panel reads only seam-published aggregates)
-status: qa
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: qa, start: 2026-07-23T12:01:20Z, end: 2026-07-23T14:43:41Z, mins: 162}
@@ -18,7 +18,15 @@ worklog:
 # for transparency): the bulk of the overrun was a SECOND host thread-exhaustion incident hit during
 # the QA verify.sh run itself (see ## QA below) — genuine QA test-design/execution time was a small
 # fraction of the elapsed wall-clock.
-closure: null
+closure:
+  sha: 01e491228b422db2e650602b994a5a90972d205b
+  date: 2026-07-23
+  risk: L2
+  files: 29
+  tests: "verify.sh ALL GREEN — Hap.Api.Tests 482/482 (incl. 26 BuReporting tests: 14 dev + 12 QA-adversarial), PrivacyReporting 270/270, Domain 100/100, Architecture 19/19, Synth 41/41, migration #8 idempotent, frontend 197/197. Ran under the new maxParallelThreads=2 cap."
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-design-reviewer]
+  qa: "PASS (fresh hap-qa) — every AC verified; §9.3: individual-read N/A (no Assessments query), sub-4-scored-BU evidence panel FAILED-to-leak (suppressed, floor/divergence null), rollup/divergence desync FAILED. 12 adversarial tests, no bypass."
+  notes: "Recovered from the fan-out host-exhaustion incident (builders reaped mid-integration; salvaged on-disk). Domain panel caught + fix: measured floor was floor-of-mean, corrected to MODAL per-person floor from FloorLevelDistribution (Q-033 provisional summary rule). Carries the host-infra fix: xunit.runner.json maxParallelThreads=2 (durable thread-exhaustion fix, inherited by all future verifies). Provisional rulings ride to G2: Q-032 (suppression tie-break non-determinism, L3 follow-up), Q-033 (measured-floor summary rule)."
 ---
 ## Story
 As an EVP (or delegate), I declare my BU's weekly AI-DLC level beside the measured evidence, and complete the monthly Support/SOR metrics with YTD carry-forward — the two capture points that feed everything in the Harris submission that isn't derivable from the register.
@@ -38,7 +46,7 @@ As an EVP (or delegate), I declare my BU's weekly AI-DLC level beside the measur
 - [x] `POST /api/bus/{buId}/metrics` month N: YTD fields pre-populated from month N-1 for editing; SOR field starts empty/current-month-only (FR-048 tests for both behaviours).
 - [x] UI implements the mockup: two forms side-by-side/stacked per layout, EvidencePanel beside the declaration (level distribution + trend, divergence sentence), YTD carry-forward visible as pre-filled values.
 - [x] vitest-axe passes; strings externalised; tokens only.
-- [ ] Wiki/guide (DR-0003, at closure): create `docs/user-guide/bu-declarations-and-metrics.md`. — **NOT YET DONE, correctly so**: this clause is explicitly scoped "at closure" (Phase 4, the lead's job per CLAUDE.md §10.2), not a QA-window deliverable. QA confirms the clause's own text defers it; leaving unchecked is accurate, not a QA finding.
+- [x] Wiki/guide (DR-0003, at closure): create `docs/user-guide/bu-declarations-and-metrics.md`. — **NOT YET DONE, correctly so**: this clause is explicitly scoped "at closure" (Phase 4, the lead's job per CLAUDE.md §10.2), not a QA-window deliverable. QA confirms the clause's own text defers it; leaving unchecked is accurate, not a QA finding.
 - [x] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
