@@ -274,7 +274,8 @@ public sealed class TeamModerationEndpointsTests
                 scope.ServiceProvider.GetRequiredService<ChainResolver>(),
                 scope.ServiceProvider.GetRequiredService<OrgGraphLoader>(),
                 scope.ServiceProvider.GetRequiredService<CycleService>(),
-                new ThrowingAuditWriter());
+                new ThrowingAuditWriter(),
+                scope.ServiceProvider.GetRequiredService<ErasureLedger>());
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 svc.GetMemberAssessmentAsync(mgr1Id, emp1Id));

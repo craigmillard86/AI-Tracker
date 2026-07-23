@@ -261,4 +261,77 @@ public sealed class SeamAssessmentStore : IAssessmentStore, ISelfAssessmentStore
             throw new AssessmentAlreadySubmittedException(personId, cycleId);
         }
     }
+
+    public async Task<IReadOnlyList<AssessmentWithScores>> GetAllForPersonAsync(
+        Guid personId, CancellationToken cancellationToken = default)
+    {
+        var assessments = await Assessments.AsNoTracking()
+            .Where(a => a.PersonId == personId)
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync(cancellationToken);
+        if (assessments.Count == 0)
+        {
+            return Array.Empty<AssessmentWithScores>();
+        }
+
+        var assessmentIds = assessments.Select(a => a.Id).ToList();
+        var scoresByAssessment = (await Scores.AsNoTracking()
+                .Where(s => assessmentIds.Contains(s.AssessmentId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(s => s.AssessmentId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<AssessmentScore>)g.ToList());
+
+        return assessments
+            .Select(a => new AssessmentWithScores(
+                a,
+                scoresByAssessment.TryGetValue(a.Id, out var scores) ? scores : Array.Empty<AssessmentScore>()))
+            .ToList();
+    }
+
+    public async Task<RetentionErasureResult> RunRetentionErasureAsync(
+        IReadOnlyCollection<Guid> cycleIds,
+        IReadOnlySet<Guid> alreadyErasedAssessmentIds,
+        Func<Assessment, AuditLog> auditFor,
+        CancellationToken cancellationToken = default)
+    {
+        if (cycleIds.Count == 0)
+        {
+            return new RetentionErasureResult(0, 0);
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        // Candidate assessments: in a past-retention cycle and NOT already carrying a RetentionErasure
+        // audit row (the idempotency ledger, resolved by the service). TRACKED — we mutate the score rows.
+        var cycleIdList = cycleIds as IReadOnlyList<Guid> ?? cycleIds.ToList();
+        var candidates = await Assessments
+            .Where(a => cycleIdList.Contains(a.CycleId) && !alreadyErasedAssessmentIds.Contains(a.Id))
+            .ToListAsync(cancellationToken);
+        if (candidates.Count == 0)
+        {
+            await tx.CommitAsync(cancellationToken); // nothing to do — idempotent no-op
+            return new RetentionErasureResult(0, 0);
+        }
+
+        var candidateIds = candidates.Select(a => a.Id).ToList();
+        var scores = await Scores
+            .Where(s => candidateIds.Contains(s.AssessmentId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var score in scores)
+        {
+            score.Erase(); // null the raw self/manager values; the row (identity) is retained (FR-052)
+        }
+
+        // Exactly one RetentionErasure audit row per affected assessment (FR-050), staged in the SAME tx as
+        // the erasure so a failed audit rolls the whole erasure back (fail-closed, mirrors ModerateAsync).
+        foreach (var assessment in candidates)
+        {
+            _db.AuditLogs.Add(auditFor(assessment));
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+        return new RetentionErasureResult(candidates.Count, scores.Count);
+    }
 }

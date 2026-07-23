@@ -67,7 +67,20 @@ For **each** of the seven roles:
 ### V6 — Notifications (FR-057, FR-061)
 Admin → run notifications: cycle reminders to non-responders, escalation summaries to managers/BU Lead near close. All visible in mailpit; none sent externally.
 
+### V3 automation (HAP-12) & the audit/GDPR surfaces
+
+V3 is automated end-to-end by `PrivacySpotChecksV3Tests` (all seven roles' out-of-chain denials, the DR-0005 one-hop-allow/2+-hop-deny cases, DR-0006 contractor deny, above-BU aggregates-only, and N<4 suppression), plus `AuditCompletenessSweepTests` (every [A] endpoint audits exactly once; no audit-mutation route exists). The complement-differencing check (step 3) stays a witnessed step, covered by `HierarchySuppressionTests` + `RollupDashboardTests`. HAP-12 also ships the audit/GDPR surfaces the witness exercises:
+
+```bash
+# Right-of-access export of your own data (writes an Export audit row):
+curl -s localhost:8080/api/me/export
+# Read-only audit search (Platform Admin): who viewed whose data, when.
+curl -s "localhost:8080/api/admin/audit?subject=<personId>&action=IndividualView"
+# Retention erasure (Platform Admin): nulls raw score values in cycles closed >3y ago; idempotent.
+curl -X POST localhost:8080/api/admin/retention/run
+```
+
 ## Gate readiness (flag, never self-certify)
 
-- **G1 (privacy)** — after HAP-12: owner witnesses V3 executed across all seven roles on the synthetic stack. M1 = zero leaks.
+- **G1 (privacy)** — after HAP-12: owner witnesses V3 executed across all seven roles on the synthetic stack (now automated as above; the owner re-runs the witnessed script). M1 = zero leaks.
 - **G2 (reporting)** — after HAP-20: owner witnesses V5 for a full weekly + monthly submission reconciled line-by-line.

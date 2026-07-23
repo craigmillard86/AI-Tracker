@@ -184,4 +184,59 @@ public class AssessmentEntityTests
 
         Assert.Null(row.Divergence);
     }
+
+    // --- HAP-12: retention erasure (FR-052) + the erased-row moderation guard (B1 riding fix) ------
+
+    [Fact]
+    public void Erase_nulls_the_raw_values_and_flags_the_row_erased()
+    {
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), 3, "sensitive evidence");
+        row.SetManager(1, "moderated to L1");
+
+        row.Erase();
+
+        Assert.True(row.Erased);
+        Assert.Equal(0, row.SelfScore);   // zeroed (non-nullable int; Q-027)
+        Assert.Null(row.SelfEvidence);
+        Assert.Null(row.ManagerScore);
+        Assert.Null(row.ManagerComment);
+    }
+
+    [Fact]
+    public void SetManager_on_an_erased_row_is_refused()
+    {
+        var dimensionId = Guid.NewGuid();
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), dimensionId, 3, "evidence");
+        row.Erase();
+
+        // A late-override re-moderation must never compute FR-009 against the fabricated-0 self-score.
+        var ex = Assert.Throws<AssessmentScoreErasedException>(() => row.SetManager(2, "comment"));
+        Assert.Equal(dimensionId, ex.DimensionId);
+        Assert.Null(row.ManagerScore); // nothing applied
+    }
+
+    [Fact]
+    public void AdoptSelf_on_an_erased_row_is_refused()
+    {
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), Guid.NewGuid(), 2, null);
+        row.Erase();
+
+        Assert.Throws<AssessmentScoreErasedException>(() => row.AdoptSelf());
+        Assert.Null(row.ManagerScore);
+    }
+
+    [Fact]
+    public void SetSelf_on_an_erased_row_is_refused()
+    {
+        var dimensionId = Guid.NewGuid();
+        var row = AssessmentScore.CreateSelf(Guid.NewGuid(), dimensionId, 2, "evidence");
+        row.Erase();
+
+        // Uniform guard across all three score mutators — a dormant-platform late override must not let a
+        // self-score be re-entered into an erased row (the same-unit-of-work backstop).
+        var ex = Assert.Throws<AssessmentScoreErasedException>(() => row.SetSelf(3, "new evidence"));
+        Assert.Equal(dimensionId, ex.DimensionId);
+        Assert.Equal(0, row.SelfScore);   // erased value stands
+        Assert.Null(row.SelfEvidence);
+    }
 }

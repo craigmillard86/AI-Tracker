@@ -77,6 +77,11 @@ public static class AssessmentEndpoints
             {
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status423Locked);
             }
+            catch (AssessmentErasedException ex)
+            {
+                // Retention-erased (FR-052) — a dormant-platform late override cannot re-populate an erased row.
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
             catch (AssessmentAlreadySubmittedException ex)
             {
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
@@ -115,6 +120,11 @@ public static class AssessmentEndpoints
             {
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status423Locked);
             }
+            catch (AssessmentErasedException ex)
+            {
+                // Retention-erased (FR-052) — a dormant-platform late override cannot re-populate an erased row.
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
             catch (AssessmentAlreadySubmittedException ex)
             {
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
@@ -142,6 +152,28 @@ public static class AssessmentEndpoints
             catch (NoCurrentCycleException)
             {
                 return Results.NotFound();
+            }
+        });
+
+        // GET /api/me/export — GDPR right-of-access (FR-051). Self-scope: the subject is the SESSION's
+        // person, never a route/body parameter, so a caller can only ever export their own data. Writes an
+        // Export audit row (fail-closed) inside the service before returning. On the api group directly (not
+        // /me/assessment) to match the contract path.
+        api.MapGet("/me/export", async (HttpContext http, PersonalDataExportService svc, CancellationToken ct) =>
+        {
+            if (!TryGetPersonId(http, out var personId))
+            {
+                return MissingPrincipal();
+            }
+
+            try
+            {
+                var export = await svc.ExportAsync(personId, ct);
+                return Results.Ok(export);
+            }
+            catch (PersonNotFoundExportException)
+            {
+                return Results.NotFound(); // broken session — no person row to export
             }
         });
     }
@@ -186,6 +218,7 @@ public sealed record SelfAssessmentResponse(
     bool Submitted,
     bool Editable,
     string PurposeLimitationKey,
+    bool DataErased,
     int DimensionCount,
     IReadOnlyList<SelfDimensionResponse> Dimensions)
 {
@@ -197,6 +230,7 @@ public sealed record SelfAssessmentResponse(
             view.Submitted,
             view.Editable,
             purposeLimitationKey,
+            view.DataErased,
             view.Dimensions.Count,
             view.Dimensions
                 .Select(d => new SelfDimensionResponse(
@@ -219,18 +253,22 @@ public sealed record ResultDimensionResponse(
     string Name,
     int DisplayOrder,
     IReadOnlyList<SelfLevelResponse> Levels,
-    int SelfScore,
-    int ManagerScore,
+    int? SelfScore,
+    int? ManagerScore,
     string? ManagerComment,
-    int Divergence);
+    int Divergence,
+    bool Erased);
 
 /// <summary>Body of GET /api/me/assessment/result — the caller's moderated scores, comments, and
-/// divergence highlights (FR-012). Returned only once the assessment is moderated/auto-adopted.</summary>
+/// divergence highlights (FR-012). Returned only once the assessment is moderated/auto-adopted.
+/// <c>DataErased</c> is true when this cycle's raw scores were destroyed under retention (FR-052) — the
+/// client renders an erased state rather than the placeholder scores.</summary>
 public sealed record AssessmentResultResponse(
     Guid CycleId,
     string CycleName,
     string State,
     DateTime? ModeratedAt,
+    bool DataErased,
     IReadOnlyList<ResultDimensionResponse> Dimensions)
 {
     public static AssessmentResultResponse From(SelfAssessmentResultView view) =>
@@ -239,6 +277,7 @@ public sealed record AssessmentResultResponse(
             view.CycleName,
             view.State,
             view.ModeratedAt,
+            view.DataErased,
             view.Dimensions
                 .Select(d => new ResultDimensionResponse(
                     d.DimensionId,
@@ -249,6 +288,7 @@ public sealed record AssessmentResultResponse(
                     d.SelfScore,
                     d.ManagerScore,
                     d.ManagerComment,
-                    d.Divergence))
+                    d.Divergence,
+                    d.Erased))
                 .ToList());
 }

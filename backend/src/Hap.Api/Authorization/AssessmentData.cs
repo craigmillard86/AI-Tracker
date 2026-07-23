@@ -55,7 +55,27 @@ public interface IAssessmentStore
         IReadOnlyList<ManagerScoreInput> decisions,
         Hap.Domain.Audit.AuditLog auditRow,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// GDPR retention erasure (FR-052; HAP-12). ATOMIC and fail-closed, mirroring <see cref="ModerateAsync"/>:
+    /// in one transaction, loads every assessment whose <c>CycleId</c> is in <paramref name="cycleIds"/> and
+    /// whose id is NOT in <paramref name="alreadyErasedAssessmentIds"/> (the audit-row idempotency ledger),
+    /// erases each of its score rows' raw values (<see cref="AssessmentScore.Erase"/>), and stages exactly one
+    /// <c>RetentionErasure</c> audit row per affected assessment (built by <paramref name="auditFor"/>) — all
+    /// committing together or not at all (an audit-write failure rolls the erasure back). Rows are NEVER
+    /// deleted; <c>RollupSnapshot</c> is never touched. Returns the count of assessments and score rows erased.
+    /// </summary>
+    Task<RetentionErasureResult> RunRetentionErasureAsync(
+        IReadOnlyCollection<Guid> cycleIds,
+        IReadOnlySet<Guid> alreadyErasedAssessmentIds,
+        Func<Assessment, Hap.Domain.Audit.AuditLog> auditFor,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>The outcome of one retention run (FR-052): how many assessments and underlying score rows had
+/// their raw values erased. Zero on an idempotent re-run (every candidate already carried a
+/// <c>RetentionErasure</c> audit row).</summary>
+public sealed record RetentionErasureResult(int AssessmentsErased, int ScoreRowsErased);
 
 /// <summary>
 /// The self-scope slice of assessment storage, invoked only by <see cref="SelfAssessmentService"/>
@@ -87,6 +107,13 @@ public interface ISelfAssessmentStore
     /// or if any required dimension is unscored (<see cref="AssessmentIncompleteException"/>).</summary>
     Task SubmitSelfAsync(
         Guid personId, Guid cycleId, IReadOnlyCollection<Guid> requiredDimensionIds, CancellationToken cancellationToken = default);
+
+    /// <summary>Every assessment the person holds, across ALL cycles, each with its per-dimension scores —
+    /// the raw material for the GDPR right-of-access export (FR-051; HAP-12). Self-scope (caller == subject),
+    /// so it returns everything held about the caller with no chain check. Empty when the person never
+    /// assessed. Ordered by assessment <c>CreatedAt</c> so the export is stable.</summary>
+    Task<IReadOnlyList<AssessmentWithScores>> GetAllForPersonAsync(
+        Guid personId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>An assessment together with its per-dimension scores (a self-scope read result).</summary>
@@ -154,6 +181,20 @@ public sealed class ModerationConflictException : Exception
     }
 }
 
+/// <summary>A moderation was attempted on a retention-erased assessment (FR-052; HAP-12). API 409.
+/// Erasure is permanent: a late override (Q-022) cannot reopen a &gt;3-year-old erased assessment for
+/// re-moderation, because that would reverse the erasure and desync the right-of-access export (which keys
+/// off the append-only RetentionErasure ledger). Raised by the ledger interlock in
+/// <see cref="ManagerModerationService"/> (and as a backstop from the domain's
+/// <c>AssessmentScoreErasedException</c>).</summary>
+public sealed class ModerationErasedException : Exception
+{
+    public ModerationErasedException(Guid assessmentId)
+        : base($"Assessment {assessmentId} has been erased under the GDPR retention policy (FR-052) and can no longer be moderated.")
+    {
+    }
+}
+
 /// <summary>Attempted to write to or re-submit an assessment that is already
 /// <see cref="AssessmentState.Submitted"/> (API 409).</summary>
 public sealed class AssessmentAlreadySubmittedException : Exception
@@ -170,6 +211,18 @@ public sealed class AssessmentIncompleteException : Exception
 {
     public AssessmentIncompleteException(int scored, int required)
         : base($"The assessment is incomplete: {scored} of {required} dimensions scored — all dimensions must be scored before submitting.")
+    {
+    }
+}
+
+/// <summary>Attempted a self-write (score upsert / submit) against a retention-erased assessment (FR-052;
+/// HAP-12). API 409. On a dormant &gt;3-year platform a late override could reopen an erased closed cycle;
+/// erasure is permanent, so the write is refused rather than re-populating an erased row (mirrors the
+/// moderation-path <c>ModerationErasedException</c>).</summary>
+public sealed class AssessmentErasedException : Exception
+{
+    public AssessmentErasedException(Guid cycleId)
+        : base($"The assessment for cycle {cycleId} has been erased under the GDPR retention policy (FR-052) and can no longer be written to.")
     {
     }
 }

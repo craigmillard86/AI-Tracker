@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Hap.Api.Authorization;
+using Hap.Domain.Audit;
 using Hap.Domain.Org;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Directory;
@@ -107,8 +110,51 @@ public static class AdminEndpoints
             await db.SaveChangesAsync(ct);
             return Results.Ok(new BusinessUnitOnboardResponse(bu.Id, bu.Code, bu.IsOnboarded));
         });
+
+        // GET /api/admin/audit?subject=&action=&from= — read-only audit search (FR-050/FR-053; HAP-12).
+        // Platform Admin only (this group). READ ONLY: there is deliberately NO POST/PUT/DELETE audit route
+        // anywhere — the log is append-only (immutable AuditLog type + DB trigger + AuditAppendOnlyTests),
+        // and a route-table test asserts no audit-mutation endpoint exists.
+        admin.MapGet("/audit", async (
+            Guid? subject, string? action, DateTime? from, AuditQueryService audit, CancellationToken ct) =>
+        {
+            AuditAction? parsedAction = null;
+            if (!string.IsNullOrWhiteSpace(action))
+            {
+                if (!Enum.TryParse<AuditAction>(action, ignoreCase: true, out var a))
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["action"] = new[] { $"Unknown audit action '{action}'." },
+                    }); // 400
+                }
+                parsedAction = a;
+            }
+
+            var rows = await audit.SearchAsync(subject, parsedAction, from, ct);
+            return Results.Ok(rows);
+        });
+
+        // POST /api/admin/retention/run — GDPR retention erasure (FR-052; HAP-12). Nulls raw self/manager
+        // score values in cycles closed > 3 years ago, RETAINING rows (aggregates untouched); writes one
+        // RetentionErasure audit row per affected assessment; idempotent. Actor = the running admin (from the
+        // session), recorded on every erasure row.
+        admin.MapPost("/retention/run", async (HttpContext http, RetentionService retention, CancellationToken ct) =>
+        {
+            if (!Guid.TryParse(http.User.FindFirstValue("person_id"), out var runByPersonId))
+            {
+                return Results.Problem("Session principal is missing person_id.", statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            var result = await retention.RunAsync(runByPersonId, asOf: null, ct);
+            return Results.Ok(new RetentionRunResponse(result.AssessmentsErased, result.ScoreRowsErased));
+        });
     }
 }
+
+/// <summary>Body of POST /api/admin/retention/run — how many assessments and score rows had their raw
+/// values erased on this run (both zero on an idempotent re-run).</summary>
+public sealed record RetentionRunResponse(int AssessmentsErased, int ScoreRowsErased);
 
 /// <summary>Body of POST /api/admin/business-units/{id}/onboard.</summary>
 public sealed record BusinessUnitOnboardResponse(Guid Id, string Code, bool IsOnboarded);

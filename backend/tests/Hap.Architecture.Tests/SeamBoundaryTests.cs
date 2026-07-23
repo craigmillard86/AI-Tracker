@@ -182,6 +182,92 @@ public class SeamBoundaryTests
         Assert.NotEmpty(FindReferencesOutsideAllowlist(new[] { dbSetLeak }, AllowedMarkers, AssessmentReferencePatterns));
     }
 
+    // --- HAP-12: raw-score DISPLAY reads must consult the erasure ledger --------------------------------
+    // The defect class QA found: a view-builder reads AssessmentScore rows and serves them without checking
+    // the RetentionErasure ledger, so a retention-erased assessment's fabricated placeholder (self→0) is
+    // presented as genuine (the B1 leak, reopened on GetMemberAssessmentAsync). Convention ("remember to
+    // check the ledger") is what let it reopen — this makes it STRUCTURAL: any production file that reads
+    // assessment scores for display (one of the store's assessment-with-scores read methods) MUST also
+    // reference the shared ErasureLedger, or the build fails. Exempt: the raw store impl + the interface that
+    // DEFINE these methods, and the low-level chain gateway (AssessmentReads) that returns raw scores to the
+    // seam by design — erasure disclosure/refusal happens at the view-builder that consumes them.
+    private static readonly string[] DisplayReadDefiningFiles =
+    {
+        "Hap.Api/Authorization/AssessmentData.cs",        // the interface declaring the methods
+        "Hap.Api/Authorization/SeamAssessmentStore.cs",   // the raw store implementing them
+        "Hap.Api/Authorization/AssessmentReads.cs",       // the chain gateway (returns raw scores to the seam)
+    };
+
+    private static readonly Regex DisplayReadMethods = new(
+        @"\b(GetAssessmentWithScoresAsync|GetByIdWithScoresAsync|GetSelfAsync|GetSelfScoresForCycleAsync|GetIndividualScoresAsync|ReadIndividualScoresAsync|GetAllForPersonAsync)\b",
+        RegexOptions.Compiled);
+
+    private static readonly Regex ErasureLedgerReference = new(
+        @"\b(ErasureLedger|IsErasedAsync|ErasedAssessmentIdsAsync|AllErasedAssessmentIdsAsync)\b",
+        RegexOptions.Compiled);
+
+    [Fact]
+    [Trait("Category", "PrivacyReporting")]
+    public void Raw_score_display_reads_consult_the_erasure_ledger()
+    {
+        var files = RepoSource.CsFiles().Select(path => (Path: path, Lines: File.ReadAllLines(path)));
+        var offenders = FindDisplayReadsWithoutErasureCheck(files, DisplayReadDefiningFiles);
+
+        Assert.True(offenders.Count == 0,
+            "Every raw-score DISPLAY read must consult the shared ErasureLedger so a retention-erased " +
+            "assessment is disclosed/refused, never served as a fabricated 0 (FR-052, HAP-12 QA finding). " +
+            "These files read assessment scores but never reference the ledger:\n" + string.Join("\n", offenders));
+    }
+
+    [Fact]
+    [Trait("Category", "PrivacyReporting")]
+    public void Erasure_ledger_display_guard_is_not_vacuous_and_flags_an_unguarded_read()
+    {
+        // Canary: real view-builders DO read scores, so scanning with a match-nothing exemption finds them.
+        var files = RepoSource.CsFiles().Select(path => (Path: path, Lines: File.ReadAllLines(path)));
+        Assert.NotEmpty(FindDisplayReadsWithoutErasureCheck(files, new[] { "____no_such_file____" }));
+
+        // Negative case: a NEW view-builder reading scores WITHOUT the ledger MUST be caught.
+        var leak = ("backend/src/Hap.Api/Authorization/NewView.cs",
+            new[] { "var current = await _store.GetSelfAsync(personId, cycleId, ct);", "return Project(current);" });
+        Assert.NotEmpty(FindDisplayReadsWithoutErasureCheck(new[] { leak }, DisplayReadDefiningFiles));
+
+        // The same read WITH a ledger reference in the file is allowed (it discloses/refuses erasure).
+        var guarded = ("backend/src/Hap.Api/Authorization/GuardedView.cs",
+            new[] { "var current = await _store.GetSelfAsync(personId, cycleId, ct);",
+                    "if (await _ledger.IsErasedAsync(personId, current.Assessment.Id, ct)) return Disclosed();" });
+        Assert.Empty(FindDisplayReadsWithoutErasureCheck(new[] { guarded }, DisplayReadDefiningFiles));
+    }
+
+    /// <summary>Detector: a file is an offender if it references a display-read method, is NOT one of the
+    /// <paramref name="exemptFiles"/> (raw store / interface / gateway), and NEVER references the erasure
+    /// ledger. Whole-file check (the ledger reference may be lines away from the read).</summary>
+    internal static IReadOnlyList<string> FindDisplayReadsWithoutErasureCheck(
+        IEnumerable<(string Path, string[] Lines)> files, IReadOnlyList<string> exemptFiles)
+    {
+        var offenders = new List<string>();
+        foreach (var (path, lines) in files)
+        {
+            var normalised = path.Replace('\\', '/');
+            if (exemptFiles.Any(marker => normalised.Contains(marker, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+            var readsScores = false;
+            var checksLedger = false;
+            foreach (var line in lines)
+            {
+                if (DisplayReadMethods.IsMatch(line)) readsScores = true;
+                if (ErasureLedgerReference.IsMatch(line)) checksLedger = true;
+            }
+            if (readsScores && !checksLedger)
+            {
+                offenders.Add($"{path}: reads assessment scores for display but never references the ErasureLedger");
+            }
+        }
+        return offenders;
+    }
+
     /// <summary>Pure detector: returns "path:line: 'pattern'" for every match in a file whose normalised
     /// path contains NONE of <paramref name="allowedMarkers"/>. Path separators are normalised so the
     /// check is OS-agnostic.</summary>

@@ -49,6 +49,12 @@ public sealed class OrgGraphRealDirectoryTests
             Guid assessmentId, Guid moderatedByPersonId, IReadOnlyList<ManagerScoreInput> decisions,
             Hap.Domain.Audit.AuditLog auditRow, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<RetentionErasureResult> RunRetentionErasureAsync(
+            IReadOnlyCollection<Guid> cycleIds, IReadOnlySet<Guid> alreadyErasedAssessmentIds,
+            Func<Hap.Domain.Assessments.Assessment, Hap.Domain.Audit.AuditLog> auditFor,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private static AssessmentReads Gateway() =>

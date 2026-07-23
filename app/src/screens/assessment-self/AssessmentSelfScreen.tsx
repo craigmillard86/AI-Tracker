@@ -251,27 +251,38 @@ export function AssessmentSelfScreen(): JSX.Element {
       {loadState === 'ready' && submitted && resultLoadState === 'ready' && result && (
         <section className="assessment-result">
           <h2 className="assessment-result-title">{strings.result.sectionTitle}</h2>
+          {result.dataErased ? (
+            <p className="assessment-status" role="status">
+              {strings.result.dataErased}
+            </p>
+          ) : (
+          <>
           <p className="assessment-result-intro">{strings.result.intro}</p>
 
           {[...result.dimensions]
             .sort((a, b) => a.displayOrder - b.displayOrder)
-            .map((dimension) => (
+            .map((dimension) => {
+              // Non-erased branch only (the dataErased case renders the notice above and never reaches here),
+              // so the scores are always present; coalesce to satisfy the nullable result type.
+              const selfScore = dimension.selfScore ?? 0;
+              const managerScore = dimension.managerScore ?? 0;
+              return (
               <div className="assessment-result-row" key={dimension.dimensionId}>
                 <h3 className="assessment-result-dimension-name">{dimension.name}</h3>
                 <div className="assessment-result-scores">
                   <span className="assessment-result-score">
                     <span className="assessment-result-score-label">{strings.result.selfLabel}</span>
-                    <span className={`level-badge level-badge-${dimension.selfScore}`}>
-                      {strings.assessment.levelAbbrev(dimension.selfScore)}
+                    <span className={`level-badge level-badge-${selfScore}`}>
+                      {strings.assessment.levelAbbrev(selfScore)}
                     </span>
                   </span>
                   <span className="assessment-result-score">
                     <span className="assessment-result-score-label">{strings.result.managerLabel}</span>
-                    <span className={`level-badge level-badge-${dimension.managerScore}`}>
-                      {strings.assessment.levelAbbrev(dimension.managerScore)}
+                    <span className={`level-badge level-badge-${managerScore}`}>
+                      {strings.assessment.levelAbbrev(managerScore)}
                     </span>
                   </span>
-                  <DivergenceFlag selfScore={dimension.selfScore} managerScore={dimension.managerScore} />
+                  <DivergenceFlag selfScore={selfScore} managerScore={managerScore} />
                 </div>
                 <p className="assessment-result-comment">
                   <span className="assessment-result-comment-label">{strings.result.commentLabel}</span>
@@ -280,7 +291,10 @@ export function AssessmentSelfScreen(): JSX.Element {
                   </span>
                 </p>
               </div>
-            ))}
+              );
+            })}
+          </>
+          )}
         </section>
       )}
 

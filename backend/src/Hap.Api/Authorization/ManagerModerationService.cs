@@ -39,6 +39,7 @@ public sealed class ManagerModerationService
     private readonly OrgGraphLoader _graphLoader;
     private readonly CycleService _cycles;
     private readonly IAuditWriter _audit;
+    private readonly ErasureLedger _ledger;
 
     public ManagerModerationService(
         HapDbContext db,
@@ -47,7 +48,8 @@ public sealed class ManagerModerationService
         ChainResolver chain,
         OrgGraphLoader graphLoader,
         CycleService cycles,
-        IAuditWriter audit)
+        IAuditWriter audit,
+        ErasureLedger ledger)
     {
         _db = db;
         _store = store;
@@ -56,6 +58,7 @@ public sealed class ManagerModerationService
         _graphLoader = graphLoader;
         _cycles = cycles;
         _audit = audit;
+        _ledger = ledger;
     }
 
     /// <summary>
@@ -188,6 +191,20 @@ public sealed class ManagerModerationService
             return null; // authorised, but nothing to view this cycle → 404, no audit (no data viewed)
         }
 
+        // Retention-erasure REFUSAL on this cross-person surface (HAP-12; QA finding). On a dormant platform
+        // the "current cycle" can resolve to a >3y-erased closed cycle (SeamCycleResolver falls back to the
+        // most-recently-closed cycle when none is Open), whose raw scores are erasure placeholders (self→0,
+        // manager/evidence→null). A manager is NOT the data subject, so rather than surface those fabricated
+        // values (the B1 leak on a second [A] surface) this refuses — returns null → 404 (existence-leak),
+        // no IndividualView audit row (nothing was viewed). The data SUBJECT's own disclosure happens on their
+        // right-of-access export and result view (which DISCLOSE erasure). This funnels through the shared
+        // ErasureLedger so the seam-boundary guard can enforce "no raw-score display read without an erasure
+        // check".
+        if (await _ledger.IsErasedAsync(subjectPersonId, current.Assessment.Id, ct))
+        {
+            return null;
+        }
+
         var person = await _db.People
             .Where(p => p.Id == subjectPersonId)
             .Select(p => new { p.DisplayName, p.OnLeave })
@@ -206,11 +223,7 @@ public sealed class ManagerModerationService
         var dimensions = await DimensionDescriptorsAsync(cycle.FrameworkVersionId, ct);
         var currentByDim = current.Scores.ToDictionary(s => s.DimensionId);
 
-        var priorCycleId = await PriorCycleIdAsync(cycle, ct);
-        var priorByDim = priorCycleId is null
-            ? new Dictionary<Guid, AssessmentScore>()
-            : (await _store.GetIndividualScoresAsync(subjectPersonId, priorCycleId.Value, ct))
-                .ToDictionary(s => s.DimensionId);
+        var priorByDim = await UnerasedPriorScoresAsync(cycle, subjectPersonId, ct);
 
         var dimensionViews = dimensions
             .Select(d =>
@@ -312,6 +325,19 @@ public sealed class ManagerModerationService
             throw new AssessmentCycleLockedException(cycle.Id);
         }
 
+        // Retention interlock (HAP-12) — erasure is PERMANENT against EVERY write path. A late override
+        // (Q-022) can reopen a cycle closed >3 years ago whose raw scores were retention-erased (FR-052);
+        // moderating it here would (i) silently REVERSE the erasure by writing a real ManagerScore/comment
+        // back into the erased row, and (ii) desync the right-of-access export, which keys off the
+        // append-only RetentionErasure ledger and would keep reporting the datum erased while a genuine new
+        // value now exists — hiding real personal data from the subject's own export (FR-051). Refuse BEFORE
+        // any write. This ledger check is the authoritative cross-request signal (the same source the export
+        // discloses from); the transient AssessmentScore.Erased guard remains the same-unit-of-work backstop.
+        if (await _ledger.IsErasedAsync(subjectPersonId, assessmentId, ct))
+        {
+            throw new ModerationErasedException(assessmentId);
+        }
+
         var rowDimensions = assessment.Scores.Select(s => s.DimensionId).ToHashSet();
         var clientByDim = new Dictionary<Guid, ManagerScoreInput>();
         foreach (var d in clientDecisions)
@@ -327,11 +353,7 @@ public sealed class ManagerModerationService
 
         // Prior-cycle scores drive the FR-063 default for any dimension the manager did not explicitly
         // decide (the "adopt self / carry forward" default the mockup pre-fills).
-        var priorCycleId = await PriorCycleIdAsync(cycle, ct);
-        var priorByDim = priorCycleId is null
-            ? new Dictionary<Guid, AssessmentScore>()
-            : (await _store.GetIndividualScoresAsync(subjectPersonId, priorCycleId.Value, ct))
-                .ToDictionary(s => s.DimensionId);
+        var priorByDim = await UnerasedPriorScoresAsync(cycle, subjectPersonId, ct);
 
         var finalDecisions = assessment.Scores
             .Select(row =>
@@ -369,6 +391,12 @@ public sealed class ManagerModerationService
         {
             throw new ModerationNotSubmittedException(assessmentId);
         }
+        catch (AssessmentScoreErasedException)
+        {
+            // Backstop: the domain refused a mutator on a row erased within THIS unit of work (the ledger
+            // interlock above is the primary, cross-request guard). Surface the same seam exception.
+            throw new ModerationErasedException(assessmentId);
+        }
         catch (ManagerCommentRequiredException ex)
         {
             throw new ModerationValidationException(ex.Message);
@@ -378,6 +406,7 @@ public sealed class ManagerModerationService
             throw new ModerationValidationException(ex.Message);
         }
     }
+
 
     /// <summary>FR-063 default: carry the prior cycle's moderated score forward when a prior moderated
     /// score exists AND the self-score is unchanged from the prior cycle; otherwise adopt the current
@@ -411,6 +440,26 @@ public sealed class ManagerModerationService
 
     private Task<Guid?> PriorCycleIdAsync(Cycle current, CancellationToken ct) =>
         SeamCycleResolver.PriorCycleIdAsync(_db, current, ct);
+
+    /// <summary>The subject's prior-cycle scores for FR-063 carry-forward, keyed by dimension — EMPTY if the
+    /// prior assessment was retention-erased (FR-052), so an erased prior never seeds a fabricated
+    /// carry-forward default. One shared helper for the member-view read and the moderation write so the
+    /// suppression can't drift between them (post-QA domain fold-in).</summary>
+    private async Task<Dictionary<Guid, AssessmentScore>> UnerasedPriorScoresAsync(
+        Cycle cycle, Guid subjectPersonId, CancellationToken ct)
+    {
+        var priorCycleId = await PriorCycleIdAsync(cycle, ct);
+        if (priorCycleId is null)
+        {
+            return new Dictionary<Guid, AssessmentScore>();
+        }
+        var prior = await _store.GetAssessmentWithScoresAsync(subjectPersonId, priorCycleId.Value, ct);
+        if (prior is null || await _ledger.IsErasedAsync(subjectPersonId, prior.Assessment.Id, ct))
+        {
+            return new Dictionary<Guid, AssessmentScore>();
+        }
+        return prior.Scores.ToDictionary(s => s.DimensionId);
+    }
 
     private async Task<IReadOnlyList<ModerationDimensionDescriptors>> DimensionDescriptorsAsync(
         Guid frameworkVersionId, CancellationToken ct)

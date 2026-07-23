@@ -111,6 +111,11 @@ public static class TeamEndpoints
                 // Not currently Submitted — nothing to moderate / already moderated.
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
+            catch (ModerationErasedException ex)
+            {
+                // Retention-erased (FR-052) — erasure is permanent; a late override cannot re-moderate it.
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
             catch (ModerationConflictException ex)
             {
                 // Lost an optimistic-concurrency race with another moderation of the same assessment.

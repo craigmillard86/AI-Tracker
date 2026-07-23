@@ -45,6 +45,12 @@ public sealed class AssessmentReadsGatewayTests
             Guid assessmentId, Guid moderatedByPersonId, IReadOnlyList<ManagerScoreInput> decisions,
             Hap.Domain.Audit.AuditLog auditRow, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<RetentionErasureResult> RunRetentionErasureAsync(
+            IReadOnlyCollection<Guid> cycleIds, IReadOnlySet<Guid> alreadyErasedAssessmentIds,
+            Func<Hap.Domain.Assessments.Assessment, Hap.Domain.Audit.AuditLog> auditFor,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     // evp → mgr → ind ; stranger under evp ; ctr (contractor) under evp → ctr_report ; xbu (BU2) under evp

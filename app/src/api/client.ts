@@ -96,6 +96,10 @@ export interface SelfAssessmentResponse {
    * lock only on Save/Submit. */
   editable: boolean;
   purposeLimitationKey: string;
+  /** True when this cycle's raw scores were destroyed under the GDPR retention policy (FR-052) — the
+   * form shows an "erased" notice and no genuine current/prior values (optional for back-compat; the
+   * server always sends it). */
+  dataErased?: boolean;
   dimensionCount: number;
   dimensions: SelfDimensionResponse[];
 }
@@ -272,11 +276,16 @@ export interface ResultDimensionResponse {
   name: string;
   displayOrder: number;
   levels: MemberLevelResponse[];
-  selfScore: number;
-  managerScore: number;
+  /** Null when this dimension was erased under retention (FR-052) — the `dataErased` branch renders an
+   * erased notice instead of the score badges, so a null selfScore/managerScore is never read here. */
+  selfScore: number | null;
+  managerScore: number | null;
   managerComment: string | null;
-  /** |self - manager|, computed server-side. */
+  /** |self - manager|, computed server-side (0 when erased). */
   divergence: number;
+  /** True when this dimension's scores were erased under retention (FR-052) — render an erased state,
+   * not the placeholder score (optional for back-compat; the server always sends it). */
+  erased?: boolean;
 }
 
 export interface AssessmentResultResponse {
@@ -284,6 +293,9 @@ export interface AssessmentResultResponse {
   cycleName: string;
   state: string;
   moderatedAt: string | null;
+  /** True when this cycle's raw scores were destroyed under the GDPR retention policy (FR-052) — the
+   * client renders an erased state rather than the placeholder scores. */
+  dataErased?: boolean;
   dimensions: ResultDimensionResponse[];
 }
 

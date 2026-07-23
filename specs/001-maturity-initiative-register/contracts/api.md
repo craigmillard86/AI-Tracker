@@ -4,7 +4,7 @@ REST/JSON over ASP.NET Core. Cookie-authenticated session (research D3). Errors:
 
 **Markers**
 - **[S]** — response contains aggregates subject to N<4 + complement suppression (FR-014). Suppressed nodes return `{ "suppressed": true, "reason": "N<4" | "Complement" }` — never zeros, never omitted silently (FR-071).
-- **[A]** — individual-level assessment read; the seam writes an `IndividualView` audit row **before** returning data; audit-write failure fails the request (FR-050). Viewing your own data is not audited as an individual view.
+- **[A]** — individual-level assessment read; the seam writes an `IndividualView` audit row **before** returning data; audit-write failure fails the request (FR-050). Viewing your own data is not audited as an individual view. **Naming convention (load-bearing — HAP-12 completeness sweep):** every [A] route MUST address the subject through a person-ish route parameter whose name contains `person`/`user`/`member`/`subject` (e.g. `{personId}`) and MUST contain `assessment` in its path. The audit-completeness route-table guard (`AuditCompletenessSweepTests`) discovers the [A] surface by exactly this shape; a new [A] endpoint that departs from it would be silently unswept, so keep the convention.
 - **[PA]** — Platform Admin only.
 
 Scope enforcement: every endpoint resolves the caller's scope via `Hap.Api/Authorization` (chain resolver + role scope). Out-of-scope requests return **404** (not 403) for person-addressed resources, to avoid existence leaks.

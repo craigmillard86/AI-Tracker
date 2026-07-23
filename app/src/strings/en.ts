@@ -141,6 +141,9 @@ export const en = {
     managerLabel: 'Manager:',
     commentLabel: 'Manager comment:',
     noComment: 'No comment provided.',
+    dataErased:
+      'This cycle’s assessment scores were erased under the data-retention policy (kept for 3 years). ' +
+      'The scores are no longer available; aggregate results are retained. You can request a full export of your data.',
   },
   dashboard: {
     breadcrumb: 'Maturity assessment',

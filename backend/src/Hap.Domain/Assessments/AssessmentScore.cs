@@ -26,6 +26,13 @@ public sealed class AssessmentScore
     public int? ManagerScore { get; private set; }
     public string? ManagerComment { get; private set; }
 
+    /// <summary>True once <see cref="Erase"/> has run on THIS instance (GDPR retention, FR-052). It is an
+    /// in-memory guard flag, deliberately NOT mapped to a column (EF-ignored in
+    /// <c>AssessmentScoreConfiguration</c>) — persisting it would need the schema change deferred to Q-027.
+    /// It exists so a mutator cannot operate on a row erased within the same unit of work; the authoritative
+    /// cross-request "was erased" signal remains the <c>RetentionErasure</c> audit ledger.</summary>
+    public bool Erased { get; private set; }
+
     // EF materialisation constructor.
     private AssessmentScore()
     {
@@ -50,6 +57,7 @@ public sealed class AssessmentScore
     /// identically to creation.</summary>
     public void SetSelf(int selfScore, string? selfEvidence)
     {
+        GuardNotErased(); // never re-enter a self-score into a retention-erased row (uniform with SetManager/AdoptSelf)
         Validate(selfScore, DimensionId);
         SelfScore = selfScore;
         SelfEvidence = NormaliseEvidence(selfEvidence);
@@ -70,6 +78,7 @@ public sealed class AssessmentScore
     /// </summary>
     public void SetManager(int managerScore, string? managerComment)
     {
+        GuardNotErased(); // never moderate against a retention-erased (fabricated-0) row — B1 riding fix
         Validate(managerScore, DimensionId);
 
         var comment = NormaliseEvidence(managerComment);
@@ -89,6 +98,7 @@ public sealed class AssessmentScore
     /// adopted-not-moderated, and so no accidental non-zero manager value can be passed on this path.</summary>
     public void AdoptSelf()
     {
+        GuardNotErased(); // never adopt a retention-erased (fabricated-0) self-score — B1 riding fix
         ManagerScore = SelfScore;
         ManagerComment = null;
     }
@@ -96,6 +106,38 @@ public sealed class AssessmentScore
     /// <summary>The divergence (|self − manager|) at or above which a manager comment is mandatory
     /// (FR-009). A named constant so the domain rule and any UI hint that mirrors it cannot drift.</summary>
     public const int DivergenceCommentThreshold = 2;
+
+    /// <summary>
+    /// GDPR retention erasure (FR-052; HAP-12): destroys the raw self/manager VALUES held on this row once
+    /// the owning cycle is past the 3-year retention period, while the row itself is RETAINED so aggregate
+    /// integrity (the frozen <c>RollupSnapshot</c>) and the row's identity survive. The free-text evidence
+    /// and comment (highest-sensitivity personal data) and the nullable manager score are set to null;
+    /// <see cref="SelfScore"/> is a non-nullable int (erasing it to SQL-NULL would need a schema change
+    /// HAP-13 owns) so it is zeroed — the authoritative "this row was erased" record is the per-assessment
+    /// <c>RetentionErasure</c> audit row the retention job writes, never the row content (QUESTIONS.md
+    /// Q-027). Erasing raw values after retention never affects any published figure: closed-cycle reads
+    /// come from the frozen snapshot, never from these rows. Deliberately distinct from the moderation
+    /// mutators so an erased row reads unambiguously as erased-not-scored in code.
+    /// </summary>
+    public void Erase()
+    {
+        SelfScore = 0;
+        SelfEvidence = null;
+        ManagerScore = null;
+        ManagerComment = null;
+        Erased = true;
+    }
+
+    // Refuses a moderation mutator on an erased row (B1 riding fix): a late-override re-moderation of
+    // >3y-erased data must never compute FR-009 divergence against the fabricated-0 self-score. Guards the
+    // same-unit-of-work case; the cross-request signal is the RetentionErasure audit ledger (Q-027).
+    private void GuardNotErased()
+    {
+        if (Erased)
+        {
+            throw new AssessmentScoreErasedException(DimensionId);
+        }
+    }
 
     private static void Validate(int score, Guid dimensionId)
     {
@@ -108,6 +150,22 @@ public sealed class AssessmentScore
     // Empty/whitespace evidence is stored as null, not "" — "no evidence" has one representation.
     private static string? NormaliseEvidence(string? evidence) =>
         string.IsNullOrWhiteSpace(evidence) ? null : evidence.Trim();
+}
+
+/// <summary>A moderation mutator (<see cref="AssessmentScore.SetManager"/>/<see cref="AssessmentScore.AdoptSelf"/>)
+/// was attempted on a retention-erased row (FR-052; HAP-12 B1). Guards against re-moderating &gt;3-year-old
+/// data whose raw values were destroyed under retention — computing FR-009 divergence against the
+/// fabricated-0 self-score would be operating on data that no longer exists.</summary>
+public sealed class AssessmentScoreErasedException : Exception
+{
+    public Guid DimensionId { get; }
+
+    public AssessmentScoreErasedException(Guid dimensionId)
+        : base($"Dimension {dimensionId}: this score has been erased under the GDPR retention policy (FR-052) " +
+               "and can no longer be moderated.")
+    {
+        DimensionId = dimensionId;
+    }
 }
 
 /// <summary>A self-score outside the 0–3 range was supplied for a dimension. The seam maps this to a

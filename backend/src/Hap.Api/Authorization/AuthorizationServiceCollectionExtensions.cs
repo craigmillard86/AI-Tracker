@@ -50,6 +50,19 @@ public static class AuthorizationServiceCollectionExtensions
         // moderated scores (seam-only, research D1); CycleService.CloseAsync resolves it and runs it in
         // the close transaction. Scoped — same request-scoped HapDbContext as the rest of the seam.
         services.AddScoped<Hap.Infrastructure.Cycles.ICycleCloseProcessor, CycleCloseProcessor>();
+
+        // The audit & GDPR surfaces (HAP-12, L3): the right-of-access export (self-scope, fail-closed Export
+        // audit row), the retention erasure job (nulls raw values > 3y, one RetentionErasure row per
+        // assessment, idempotent via the audit ledger), and the read-only audit search. Export + retention
+        // wrap the request-scoped seam store (assessment writes stay in-seam); the audit search reads the
+        // public AuditLogs set. All scoped — same request-scoped HapDbContext as the rest of the seam.
+        // The single erasure-ledger source (HAP-12) — the authoritative "which assessments are retention-
+        // erased" signal every raw-score display read, the export, the moderation interlock, and the
+        // retention idempotency check consult (enforced structurally by SeamBoundaryTests). Scoped.
+        services.AddScoped<ErasureLedger>();
+        services.AddScoped<PersonalDataExportService>();
+        services.AddScoped<RetentionService>();
+        services.AddScoped<AuditQueryService>();
         return services;
     }
 }

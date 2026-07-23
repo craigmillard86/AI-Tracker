@@ -26,12 +26,14 @@ public sealed class SelfAssessmentService
     private readonly HapDbContext _db;
     private readonly ISelfAssessmentStore _store;
     private readonly CycleService _cycles;
+    private readonly ErasureLedger _ledger;
 
-    public SelfAssessmentService(HapDbContext db, ISelfAssessmentStore store, CycleService cycles)
+    public SelfAssessmentService(HapDbContext db, ISelfAssessmentStore store, CycleService cycles, ErasureLedger ledger)
     {
         _db = db;
         _store = store;
         _cycles = cycles;
+        _ledger = ledger;
     }
 
     /// <summary>The caller's self-assessment for the current cycle: framework dimensions + descriptors
@@ -46,14 +48,27 @@ public sealed class SelfAssessmentService
         var dimensions = await DimensionsAsync(cycle.FrameworkVersionId, ct);
 
         var current = await _store.GetSelfAsync(personId, cycle.Id, ct);
-        var currentByDim = (current?.Scores ?? Array.Empty<AssessmentScore>())
-            .ToDictionary(s => s.DimensionId);
-
-        var priorCycleId = await PriorCycleIdAsync(cycle, ct);
-        var priorByDim = priorCycleId is null
+        // If the CURRENT cycle's assessment was retention-erased (a dormant platform resolving "current" to a
+        // >3y-erased closed cycle), the stored scores are fabricated placeholders (self→0, evidence→null).
+        // DISCLOSE it (own-data right-of-access, FR-051/FR-052): flag DataErased and show no genuine current
+        // values — never the fabricated 0. Via the shared ErasureLedger so the seam-boundary guard enforces it.
+        var currentErased = current is not null && await _ledger.IsErasedAsync(personId, current.Assessment.Id, ct);
+        var currentByDim = current is null || currentErased
             ? new Dictionary<Guid, AssessmentScore>()
-            : (await _store.GetSelfScoresForCycleAsync(personId, priorCycleId.Value, ct))
-                .ToDictionary(s => s.DimensionId);
+            : current.Scores.ToDictionary(s => s.DimensionId);
+
+        // Prior-cycle pre-fill (FR-062) — suppressed if the PRIOR assessment was erased: an erased prior must
+        // NOT pre-populate a fabricated 0. Read the prior assessment (not just its scores) so we can check it.
+        var priorCycleId = await PriorCycleIdAsync(cycle, ct);
+        var priorByDim = new Dictionary<Guid, AssessmentScore>();
+        if (priorCycleId is not null)
+        {
+            var prior = await _store.GetSelfAsync(personId, priorCycleId.Value, ct);
+            if (prior is not null && !await _ledger.IsErasedAsync(personId, prior.Assessment.Id, ct))
+            {
+                priorByDim = prior.Scores.ToDictionary(s => s.DimensionId);
+            }
+        }
 
         var dimensionViews = dimensions
             .Select(d =>
@@ -87,6 +102,7 @@ public sealed class SelfAssessmentService
             CycleState: cycle.State.ToString(),
             Submitted: submitted,
             Editable: editable,
+            DataErased: currentErased,
             Dimensions: dimensionViews);
     }
 
@@ -110,6 +126,7 @@ public sealed class SelfAssessmentService
         var cycle = await CurrentCycleAsync(ct);
         await EnsureInvitedAsync(cycle, personId, ct);
         await EnsureSubmissionAllowedAsync(cycle, personId, ct);
+        await EnsureNotErasedAsync(cycle, personId, ct);
         await ValidateDimensionsAsync(cycle.FrameworkVersionId, scores, ct);
         await _store.UpsertSelfScoresAsync(personId, cycle.Id, scores, ct);
     }
@@ -122,6 +139,7 @@ public sealed class SelfAssessmentService
         var cycle = await CurrentCycleAsync(ct);
         await EnsureInvitedAsync(cycle, personId, ct);
         await EnsureSubmissionAllowedAsync(cycle, personId, ct);
+        await EnsureNotErasedAsync(cycle, personId, ct);
 
         var requiredDimensionIds = await _db.Dimensions
             .Where(d => d.FrameworkVersionId == cycle.FrameworkVersionId)
@@ -129,6 +147,19 @@ public sealed class SelfAssessmentService
             .ToListAsync(ct);
 
         await _store.SubmitSelfAsync(personId, cycle.Id, requiredDimensionIds, ct);
+    }
+
+    // Self-write erasure interlock (post-QA fold-in; mirrors ManagerModerationService's write interlock).
+    // On a dormant >3-year platform the "current cycle" can resolve to a retention-erased closed cycle; a
+    // Q-022 late override would otherwise let a self-write put a new value into an erased row → a
+    // self-inflicted export desync (FR-051). Refuse before any write, via the shared ledger.
+    private async Task EnsureNotErasedAsync(Cycle cycle, Guid personId, CancellationToken ct)
+    {
+        var existing = await _store.GetSelfAsync(personId, cycle.Id, ct);
+        if (existing is not null && await _ledger.IsErasedAsync(personId, existing.Assessment.Id, ct))
+        {
+            throw new AssessmentErasedException(cycle.Id);
+        }
     }
 
     /// <summary>The caller's OWN moderated result for the current cycle (contracts/api.md GET
@@ -150,6 +181,12 @@ public sealed class SelfAssessmentService
         var dimensions = await DimensionsAsync(cycle.FrameworkVersionId, ct);
         var byDim = current.Scores.ToDictionary(s => s.DimensionId);
 
+        // If this cycle's assessment was retention-erased (dormant platform, >3y), DISCLOSE erasure to the
+        // data subject (own-data right-of-access, FR-051/FR-052) rather than presenting the fabricated
+        // placeholder scores as a genuine moderated result. Flag DataErased + per-dimension Erased; the
+        // divergence/values are not meaningful and the client renders an erased state. Shared ErasureLedger.
+        var dataErased = await _ledger.IsErasedAsync(personId, current.Assessment.Id, ct);
+
         var dimensionViews = dimensions
             .Where(d => byDim.ContainsKey(d.Id))
             .Select(d =>
@@ -164,10 +201,13 @@ public sealed class SelfAssessmentService
                     Name: d.Name,
                     DisplayOrder: d.DisplayOrder,
                     Levels: d.Levels,
-                    SelfScore: score.SelfScore,
-                    ManagerScore: managerScore,
-                    ManagerComment: score.ManagerComment,
-                    Divergence: Math.Abs(score.SelfScore - managerScore));
+                    // Erased → null every value (matches ExportScore; defense-in-depth for any consumer that
+                    // iterates dimensions without checking Erased). Genuine values only on the non-erased path.
+                    SelfScore: dataErased ? null : score.SelfScore,
+                    ManagerScore: dataErased ? null : managerScore,
+                    ManagerComment: dataErased ? null : score.ManagerComment,
+                    Divergence: dataErased ? 0 : Math.Abs(score.SelfScore - managerScore),
+                    Erased: dataErased);
             })
             .ToList();
 
@@ -176,6 +216,7 @@ public sealed class SelfAssessmentService
             CycleName: cycle.Name,
             State: current.Assessment.State.ToString(),
             ModeratedAt: current.Assessment.ModeratedAt,
+            DataErased: dataErased,
             Dimensions: dimensionViews);
     }
 
@@ -304,6 +345,7 @@ public sealed record SelfAssessmentView(
     string CycleState,
     bool Submitted,
     bool Editable,
+    bool DataErased,
     IReadOnlyList<SelfDimensionView> Dimensions);
 
 /// <summary>One dimension of the caller's moderated result (FR-012): the retained self score, the
@@ -315,16 +357,20 @@ public sealed record SelfResultDimensionView(
     string Name,
     int DisplayOrder,
     IReadOnlyList<SelfLevelDescriptor> Levels,
-    int SelfScore,
-    int ManagerScore,
+    int? SelfScore,
+    int? ManagerScore,
     string? ManagerComment,
-    int Divergence);
+    int Divergence,
+    bool Erased);
 
 /// <summary>The caller's moderated result for the current cycle (FR-012). Only produced once the
-/// assessment is Moderated or AutoAdopted; the endpoint returns 404 otherwise.</summary>
+/// assessment is Moderated or AutoAdopted; the endpoint returns 404 otherwise. <see cref="DataErased"/> is
+/// true when this cycle's raw scores were destroyed under retention (FR-052) — the client renders an erased
+/// state rather than presenting the placeholder scores as a genuine result.</summary>
 public sealed record SelfAssessmentResultView(
     Guid CycleId,
     string CycleName,
     string State,
     DateTime? ModeratedAt,
+    bool DataErased,
     IReadOnlyList<SelfResultDimensionView> Dimensions);

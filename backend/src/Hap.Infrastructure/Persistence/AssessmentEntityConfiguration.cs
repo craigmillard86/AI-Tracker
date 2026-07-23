@@ -64,6 +64,10 @@ public sealed class AssessmentScoreConfiguration : IEntityTypeConfiguration<Asse
         e.Property(x => x.SelfEvidence).IsRequired(false);
         e.Property(x => x.ManagerScore).IsRequired(false);
         e.Property(x => x.ManagerComment).IsRequired(false);
+        // Erased is an in-memory guard flag only (HAP-12 B1) — NOT a column. Persisting it would need the
+        // schema change deferred to Q-027; the authoritative cross-request signal is the RetentionErasure
+        // audit ledger. Ignored so EF does not expect an "Erased" column (which would break migrations).
+        e.Ignore(x => x.Erased);
 
         // One score row per (assessment, dimension) — the upsert relies on this uniqueness.
         e.HasIndex(x => new { x.AssessmentId, x.DimensionId }).IsUnique();
