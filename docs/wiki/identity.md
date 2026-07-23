@@ -26,6 +26,8 @@ Manager / BU Lead / Group Leader / Portfolio Leader are **computed per request**
 
 ASP.NET cookie auth: cookie `hap_auth`, HttpOnly, SameSite=Lax, 8h sliding. `OnRedirectToLogin`/`OnRedirectToAccessDenied` are overridden to return 401/403 directly (this is an API, not a browser-redirect app). The frontend talks same-origin via a Vite dev-server proxy, so the Lax cookie never crosses an origin. No session fixation (a fresh ticket per sign-in, no pre-auth session).
 
+**Shell surface (HAP-23 — FR-055/056):** the app top bar shows the caller's live identity — display name + role(s) — fetched from `GET /api/me` on mount (falls back to an "identity unavailable" label if that fetch fails), and a keyboard-focusable **Sign out** button that calls `POST /auth/signout` then returns the app to the dev sign-in role-picker. Identity lives only in `AppShell`'s local state (no module-level cache), so unmounting the shell on sign-out is what discards it — a subsequent `/api/**` call is unauthenticated until the next sign-in. Explicit `OrgRole` grants come back as raw C# enum names and are mapped to labels client-side (mirroring `LocalDevProvider.ExplicitRoleBySeedLabel`); hierarchy-derived roles arrive display-ready.
+
 ## Authorization boundary
 
 Every `/api/**` route is under `app.MapGroup("/api").RequireAuthorization()` — unauthenticated requests get 401 (enforced by a route-table sweep, not a hand-list). On top of that, a **PlatformAdmin (403) policy** gates all admin surfaces: `/api/admin/sync`, `/api/admin/overrides`, and `/api/admin/frameworks`. `GET /api/frameworks/current` and `GET /api/me` are blanket-authenticated (any role); `/auth/*` and `/healthz` are anonymous.

@@ -5,12 +5,20 @@ epic: E1-foundations
 wave: 2
 fr: [FR-055, FR-056]
 risk: L1                # React shell UI; reads the caller's own identity; calls the existing signout endpoint — no auth-decision logic, no assessment data path
-status: qa
+status: done
 estimate: {dev: S, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-22T21:29:02Z, end: 2026-07-23T02:25:00Z, mins: 295}
   - {phase: qa, start: 2026-07-23T02:33:09Z, end: 2026-07-23T02:40:55Z, mins: 7}
-closure: null
+closure:
+  sha: dce755279f5db06362d7f1e87d9c767be58a874b
+  date: 2026-07-23
+  risk: L1
+  files: 8
+  tests: "frontend 162/162 on integrated main (HAP-13 register + HAP-23 shell tests together), typecheck+lint+build clean; branch gate verify.sh ALL GREEN (Api 351/351, PrivacyReporting 232/232, frontend 147/147). Backend untouched by this story."
+  panel: [hap-design-reviewer, hap-code-reviewer]
+  qa: "PASS (fresh hap-qa) — all ACs literal-verified + 4 new negative-path tests (real Enter-key activation, App-level sign-out round-trip, identity loading-vs-failure, non-2xx signout path). §9.3 assessment attempts N/A (frontend-only, no Authorization/Assessments path)."
+  notes: "Two design-addendum advisories recorded in the L1-panel-verdicts section for a future DESIGN.md pass (outline-button-on-deep-navy pattern; light-teal-accent-as-running-text) — cosmetic, non-blocking. Sign-out/getting-started belongs in HAP-21's user-guide baseline (no getting-started page exists yet to make stale)."
 ---
 ## Story
 As any signed-in user I can sign out from the app shell and I can see who I am currently signed in as — so I can end my session and (in the local dev provider) switch roles without clearing browser cookies by hand.
