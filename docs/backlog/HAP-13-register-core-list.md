@@ -5,12 +5,22 @@ epic: E3-register
 wave: 2
 fr: [FR-026, FR-027, FR-034, FR-035]
 risk: L2                # trigger: EF migrations/schema (no assessment reads; Harris taxonomy as seeded data)
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
   - {phase: dev, start: 2026-07-22T21:25:05Z, end: 2026-07-23T00:41:09Z, mins: 196}
   - {phase: qa, start: 2026-07-23T00:44:38Z, end: 2026-07-23T01:15:23Z, mins: 30}
-closure: null
+# post-QA riskTier fix (un-deferred on QA's finding) was an un-timestamped fold-in dev
+# round — no wallclock captured, so per the honesty rule nothing is logged for it (the
+# fix + its green gate run are recorded in "Post-QA fix" below).
+closure:
+  sha: 3b5f843b0b2d2f05bd4659b44d28ffe4a27305d2
+  date: 2026-07-23
+  risk: L2
+  files: 37
+  tests: "backend Api 378/378, Domain 79/79, Architecture 14/14, Synth 41/41; PrivacyReporting unchanged (Api 232, Domain 13, Arch 9); frontend 153/153; migration #6 idempotent — verify.sh green on the merge candidate AND re-run green on integrated main (HAP-12+HAP-13 together)"
+  panel: [hap-design-reviewer, hap-domain-specialist, hap-code-reviewer]
+  qa: "PASS (fresh hap-qa) — FR-034 create-authority role-matrix all 7 roles incl. Platform Admin, PUT authority incl. cross-BU BU-Lead + raw-JSON BU/stage smuggling, phantom categoryId, AI-DLC boundary; QA found riskTier \"99\"->201 reachable AC violation, un-deferred + fixed (Enum.IsDefined -> 422). No assessment/audit read path (L2, not L3)."
 ---
 ## Story
 As a Manager or BU Lead, I can register AI initiatives classified against the Harris taxonomy and find them through a filterable, searchable list — so the group finally has a live register instead of tribal knowledge.
@@ -32,7 +42,7 @@ As a Manager or BU Lead, I can register AI initiatives classified against the Ha
 - [x] UI implements the mockup: DataTable with columns BU, category, stage (+ Harris-mapped label), AI-DLC level badge, RAG chip, customers, last update; StaleRowFlag on rows >7d (amber) / >14d (red) with day count in text; filters panel; sticky header; pagination at >25 rows.
 - [x] Level badges always print the level number; RAG chips always carry a text label (A2 colour-independence; component tests).
 - [x] vitest-axe passes; strings externalised; tokens only.
-- [ ] Wiki/guide (DR-0003, at closure): create `docs/wiki/register.md` (extended by HAP-14) and `docs/user-guide/initiative-register.md` (list/create portions). **N/A for QA — scoped to Phase 4 closure, not yet due; confirmed neither file exists prematurely.**
+- [x] Wiki/guide (DR-0003, at closure): create `docs/wiki/register.md` (extended by HAP-14) and `docs/user-guide/initiative-register.md` (list/create portions). **Created at closure (Phase 4).**
 - [x] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
