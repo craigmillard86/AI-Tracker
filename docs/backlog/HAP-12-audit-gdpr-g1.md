@@ -5,13 +5,22 @@ epic: E2-assessment
 wave: 1
 fr: [FR-050, FR-051, FR-052, FR-053]
 risk: L3                # trigger: audit-log write/read paths + GDPR retention/erasure/export
-status: in-progress
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-22T17:59:37Z, end: 2026-07-22T20:10:42Z, mins: 132}
   - {phase: qa, start: 2026-07-22T20:12:37Z, end: 2026-07-22T20:27:13Z, mins: 15}
   - {phase: qa, start: 2026-07-22T22:58:53Z, end: 2026-07-23T00:09:22Z, mins: 70}
-closure: null
+closure:
+  sha: 1a9223f
+  date: 2026-07-23
+  risk: L3
+  files: 33  # ErasureLedger + audit reader/export/retention services, self-write + moderation erasure interlocks, endpoints, structural SeamBoundary display-read guard, V3 automation, frontend erasure notice, tests, docs/wiki/audit-and-gdpr.md
+  tests: backend 530 (Category=PrivacyReporting 293); frontend 138; verify.sh green; no migration
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-red-team]  # L3; 3 rounds + a post-QA re-panel, clean at fb54643
+  qa: "hap-qa — QA-1 found a G1-blocking erased-as-genuine defect on a 2nd read surface (member-read); fixed STRUCTURALLY (shared ErasureLedger + build-time guard); QA-2 PASS — no path found, guard completeness reflection-cross-checked"
+  gate: "G1 READY — owner must witness quickstart.md V3 across all 7 roles (M1 = zero leaks). Ratification items + parked residual (retention/self-write TOCTOU) in docs/wiki/audit-and-gdpr.md"
+  worklog_note: "the post-QA fold-in dev rounds were not separately timestamped by the dev; per the §8.7/§12 honesty rule they are logged as nothing (not reconstructed) — the dev worklog reflects only the first clocked interval (132 mins)"
 ---
 ## Story
 As the platform owner, every individual-level view is provably audited, any employee can receive a full export of their data, and raw scores older than the retention period are erased on schedule — completing the evidence set for the human-witnessed G1 privacy gate.
