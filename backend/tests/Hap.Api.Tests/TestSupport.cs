@@ -104,7 +104,8 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
             "level_descriptors, dimensions, framework_versions, frameworks, " +
             "cycle_invitations, cycle_late_overrides, cycles, " +
             "initiative_stage_history, initiative_weekly_updates, initiative_nr_lines, " +
-            "initiatives, harris_categories, harris_stage_map RESTART IDENTITY CASCADE; " +
+            "initiatives, harris_categories, harris_stage_map, " +
+            "bu_ai_dlc_declarations, bu_monthly_metrics RESTART IDENTITY CASCADE; " +
             "SET session_replication_role = 'origin';");
     }
 

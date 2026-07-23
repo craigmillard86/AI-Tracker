@@ -74,6 +74,7 @@ api.MapAssessmentEndpoints();
 api.MapTeamEndpoints();
 api.MapRollupEndpoints();
 api.MapRegisterEndpoints();
+api.MapBuReportingEndpoints();
 
 app.Run();
 

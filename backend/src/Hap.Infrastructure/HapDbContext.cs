@@ -19,7 +19,10 @@ namespace Hap.Infrastructure;
 /// #6 (HAP-13) adds the initiative register (Initiative/HarrisCategory/HarrisStageMap). Migration #7
 /// (HAP-14) chains behind that with initiative detail tracking (InitiativeStageHistory/
 /// InitiativeWeeklyUpdate/InitiativeNRLine — FR-028/FR-029/FR-033) and extends the initiatives table with
-/// the governance/technology panels (FR-030/FR-032). Later stories chain forward-only migrations behind
+/// the governance/technology panels (FR-030/FR-032). Migration #8 (HAP-15) chains behind that with the
+/// BU Harris-reporting capture tables (BuAiDlcDeclaration/BuMonthlyMetrics — FR-047/FR-048); the latter's
+/// support-figure panels map to native jsonb columns via owned-type <c>ToJson()</c> mapping (see
+/// <c>Persistence.BuMonthlyMetricsConfiguration</c>). Later stories chain forward-only migrations behind
 /// this one.
 ///
 /// Note the deliberate asymmetry on <see cref="AuditLogs"/>: the entity is immutable (no
@@ -63,6 +66,11 @@ public class HapDbContext : DbContext
     public DbSet<Domain.Register.InitiativeStageHistory> InitiativeStageHistories => Set<Domain.Register.InitiativeStageHistory>();
     public DbSet<Domain.Register.InitiativeWeeklyUpdate> InitiativeWeeklyUpdates => Set<Domain.Register.InitiativeWeeklyUpdate>();
     public DbSet<Domain.Register.InitiativeNRLine> InitiativeNRLines => Set<Domain.Register.InitiativeNRLine>();
+
+    // BU Harris-reporting capture (HAP-15, migration #8) — Harris-reporting data, not individual
+    // assessment data, so these carry public DbSets like the register above.
+    public DbSet<Domain.Reporting.BuAiDlcDeclaration> BuAiDlcDeclarations => Set<Domain.Reporting.BuAiDlcDeclaration>();
+    public DbSet<Domain.Reporting.BuMonthlyMetrics> BuMonthlyMetrics => Set<Domain.Reporting.BuMonthlyMetrics>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -291,5 +299,9 @@ public class HapDbContext : DbContext
         modelBuilder.ApplyConfiguration(new Persistence.InitiativeStageHistoryConfiguration());
         modelBuilder.ApplyConfiguration(new Persistence.InitiativeWeeklyUpdateConfiguration());
         modelBuilder.ApplyConfiguration(new Persistence.InitiativeNRLineConfiguration());
+
+        // BU Harris-reporting capture (HAP-15, migration #8) — Harris-reporting data with public DbSets.
+        modelBuilder.ApplyConfiguration(new Persistence.BuAiDlcDeclarationConfiguration());
+        modelBuilder.ApplyConfiguration(new Persistence.BuMonthlyMetricsConfiguration());
     }
 }

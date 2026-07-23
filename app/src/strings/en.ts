@@ -25,6 +25,7 @@ export const en = {
     managerReview: 'Manager Review',
     register: 'Initiative Register',
     submissions: 'Harris Submissions',
+    buForms: 'BU Reporting Forms',
     admin: 'Admin',
   },
   signIn: {
@@ -363,5 +364,70 @@ export const en = {
     recentUpdatesTitle: 'Recent updates',
     recentUpdatesEmpty: 'No updates yet.',
     updateMeta: (dateText: string, author: string): string => `${dateText} · ${author}`,
+  },
+  buForms: {
+    breadcrumb: 'Harris reporting',
+    pageTitle: 'BU reporting forms',
+    subtitle: 'Harris submission inputs for your business unit',
+    loading: 'Loading your BU reporting forms…',
+    loadError: 'Could not load your BU reporting forms. Is the API running?',
+    noRoleTitle: 'No BU reporting role',
+    noRoleBody: "You don't have a BU reporting role.",
+    // Weekly declaration card
+    declarationCardTitle: 'Weekly BU AI-DLC declaration',
+    declarationCardHint: 'Feeds the weekly Harris submission · due Mondays',
+    declaredLevelFieldLabel: 'Declared AI-DLC level',
+    declaredLevelOptionLabel: (level: number): string => `Declared level L${level}`,
+    nextLevelDateLabel: 'Date expected to reach next level',
+    ragFieldLabel: 'Status (RAG)',
+    ragLabels: {
+      OnTrack: 'On Track',
+      AtRisk: 'At Risk',
+      OffTrack: 'Off Track',
+    },
+    noteLabel: 'Internal note (optional)',
+    notePlaceholder: 'Context for the declared level…',
+    saveDeclarationButton: 'Save weekly declaration',
+    declarationSaveSuccess: 'Weekly declaration saved.',
+    declarationSaveError: 'Could not save this declaration. Please try again.',
+    declarationSaveForbiddenError: 'You are not the BU Lead or an authorised delegate for this business unit.',
+    declarationSaveValidationError: 'Check the declared level, RAG status and date, then try again.',
+    historyTitle: 'Declaration history',
+    historyEmpty: 'No declarations submitted yet.',
+    // EvidencePanel (DESIGN.md A8 — DimensionBar reuse, DivergenceFlag + sentence)
+    evidenceTitle: 'Measured evidence',
+    measuredFloorHeadline: (level: number, mean: string): string => `Measured floor is L${level} (mean ${mean}).`,
+    evidenceInfoNote: 'Declaring above measured is allowed but the divergence is reported to group leadership.',
+    divergenceSentence: (declaredLevel: number, divergence: number): string => {
+      if (divergence === 0) {
+        return `Declared L${declaredLevel} matches the measured floor.`;
+      }
+      const direction = divergence > 0 ? 'above' : 'below';
+      return `Declared L${declaredLevel} is ${Math.abs(divergence)} ${direction} the measured floor.`;
+    },
+    // Monthly metrics card
+    metricsCardTitle: 'Monthly BU metrics',
+    metricsCardHint: 'Support & SOR figures for the monthly Harris submission · YTD carries forward',
+    supportInternalLegend: 'Support — internal use',
+    timeSavingsLabel: 'Estimated time savings (%)',
+    timeSavingsHint: 'Team-estimated productivity gain from internal AI use',
+    fewerPeopleLabel: 'Fewer people needed?',
+    fewerPeopleUnselected: 'Select…',
+    fewerPeopleOptions: ['No — reallocated', 'Yes', 'Too early to tell'] as readonly string[],
+    supportRatioLabel: 'Support-ratio impact',
+    supportCustomerLegend: 'Support — customer use (YTD)',
+    carriedForwardHint: 'Carried forward from last month — review and edit.',
+    customersYtdLabel: '# unique customers supported',
+    ticketsYtdLabel: 'Total tickets',
+    resolvedByAiYtdLabel: '# resolved 100% by AI',
+    aiAssistedYtdLabel: '# AI-assisted',
+    sorLegend: 'API / System of Record — current month only',
+    sorFieldLabel: 'Are other applications calling our SOR?',
+    sorFieldHint: 'Per Harris form instructions, SOR usage is current-month, not YTD.',
+    saveMetricsButton: 'Save monthly metrics',
+    metricsSaveSuccess: 'Monthly metrics saved.',
+    metricsSaveError: 'Could not save these metrics. Please try again.',
+    metricsSaveForbiddenError: 'You are not the BU Lead or an authorised delegate for this business unit.',
+    metricsSaveValidationError: 'Check the entered figures, then try again.',
   },
 } as const;

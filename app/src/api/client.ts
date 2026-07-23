@@ -668,3 +668,146 @@ export async function deleteNrLine(id: string, lineId: string): Promise<void> {
     throw new InitiativeWriteError(response.status);
   }
 }
+
+/**
+ * BU capture-forms endpoints (HAP-15; FR-047/FR-048; contracts/api.md "BU Lead scope" declarations
+ * and metrics). The weekly AI-DLC declaration (level 0-3, RAG, next-level-expected date, optional note)
+ * is shown beside the measured evidence panel — `BuDeclarationsResponse.measured` reuses HAP-11's
+ * `NodeAggregate` shape verbatim (no new score query; the read is a rollup read, keeping this L2 not
+ * L3, per the story's Phase-1 risk note). The monthly Support/SOR metrics form YTD-carries-forward the
+ * customer-facing figures from the prior month while the SOR field is always current-month-only. Types
+ * mirror the API's camelCase response shapes exactly. Both POSTs are UPSERTS — a same-week/same-month
+ * resubmission updates the existing row, so the client always POSTs the full form rather than tracking
+ * a separate PUT/id.
+ */
+
+export interface BuDeclarationResponse {
+  id: string;
+  businessUnitId: string;
+  /** ISO date — the Monday of the declared week. */
+  weekOf: string;
+  declaredLevel: number;
+  nextLevelExpectedDate: string | null;
+  ragStatus: RagStatus;
+  note: string | null;
+  declaredBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BuDeclarationsResponse {
+  businessUnitId: string;
+  /** Newest week first. */
+  declarations: BuDeclarationResponse[];
+  /** The measured-evidence aggregate (HAP-11's rollup output, suppression-projected server-side). */
+  measured: NodeAggregate;
+  measuredFloorLevel: number | null;
+  /** declaredLevel - measuredFloorLevel, signed. Null when either side is unavailable. */
+  declaredVsMeasuredDivergence: number | null;
+}
+
+/** POST /api/bus/{buId}/declarations body — an upsert keyed on (businessUnitId, weekOf). */
+export interface BuDeclarationRequest {
+  weekOf: string;
+  declaredLevel: number;
+  nextLevelExpectedDate: string | null;
+  ragStatus: RagStatus;
+  note: string | null;
+}
+
+export interface SupportInternal {
+  timeSavingsPct: number | null;
+  fewerPeopleNeeded: string | null;
+  supportRatioImpact: string | null;
+}
+
+export interface SupportCustomer {
+  customersYtd: number | null;
+  ticketsYtd: number | null;
+  resolvedByAiYtd: number | null;
+  aiAssistedYtd: number | null;
+}
+
+export interface BuMonthlyMetricsResponse {
+  businessUnitId: string;
+  /** ISO date, first-of-month. */
+  month: string;
+  supportInternal: SupportInternal;
+  supportCustomer: SupportCustomer;
+  sorCalledByOtherApps: string | null;
+  /** True when `supportCustomer` was pre-filled from the PRIOR month (no row saved yet this month). */
+  carriedForward: boolean;
+  submittedBy: string | null;
+  createdAt: string | null;
+}
+
+/** POST /api/bus/{buId}/metrics body — an upsert keyed on (businessUnitId, month). */
+export interface BuMonthlyMetricsRequest {
+  month: string;
+  supportInternal: SupportInternal;
+  supportCustomer: SupportCustomer;
+  sorCalledByOtherApps: string | null;
+}
+
+/** Thrown by the BU capture-forms write calls with the response's HTTP status so the caller can map it
+ * to the right inline message (403 not BU Lead/delegate, 422 validation, 404 unknown BU). */
+export class BuFormsWriteError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`BU forms write failed (${status})`);
+    this.status = status;
+  }
+}
+
+/** GET /api/bus/{buId}/declarations. Returns null on a 404 (unknown BU, or out of the caller's scope)
+ * rather than throwing — an expected steady state, not an error. */
+export async function fetchBuDeclarations(buId: string): Promise<BuDeclarationsResponse | null> {
+  const response = await fetch(`/api/bus/${buId}/declarations`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/bus/${buId}/declarations failed (${response.status})`);
+  }
+  return (await response.json()) as BuDeclarationsResponse;
+}
+
+/** POST /api/bus/{buId}/declarations — upserts the caller's declaration for `body.weekOf`. */
+export async function postBuDeclaration(buId: string, body: BuDeclarationRequest): Promise<BuDeclarationResponse> {
+  const response = await fetch(`/api/bus/${buId}/declarations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status !== 200 && response.status !== 201) {
+    throw new BuFormsWriteError(response.status);
+  }
+  return (await response.json()) as BuDeclarationResponse;
+}
+
+/** GET /api/bus/{buId}/metrics?month=yyyy-MM-dd. Returns null on a 404 (unknown BU, or out of the
+ * caller's scope) rather than throwing. `month` is an ISO date string, first-of-month. */
+export async function fetchBuMetrics(buId: string, month: string): Promise<BuMonthlyMetricsResponse | null> {
+  const response = await fetch(`/api/bus/${buId}/metrics?month=${encodeURIComponent(month)}`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`GET /api/bus/${buId}/metrics failed (${response.status})`);
+  }
+  return (await response.json()) as BuMonthlyMetricsResponse;
+}
+
+/** POST /api/bus/{buId}/metrics — upserts the caller's monthly metrics for `body.month`. */
+export async function postBuMetrics(buId: string, body: BuMonthlyMetricsRequest): Promise<BuMonthlyMetricsResponse> {
+  const response = await fetch(`/api/bus/${buId}/metrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status !== 200 && response.status !== 201) {
+    throw new BuFormsWriteError(response.status);
+  }
+  return (await response.json()) as BuMonthlyMetricsResponse;
+}

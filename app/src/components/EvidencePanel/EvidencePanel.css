@@ -1,0 +1,76 @@
+/* EvidencePanel — DESIGN.md A8 "EvidencePanel" (card, DimensionBar reuse, DivergenceFlag + sentence).
+   Built exclusively from tokens.css; no new colours, radii, shadows, or type sizes. */
+
+.evidence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.evidence-panel-suppressed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.evidence-panel-title {
+  margin: 0;
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+}
+
+.evidence-panel-callout {
+  border: 1px solid var(--color-light-teal-accent);
+  background: var(--color-ice-blue-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-md-sm) var(--space-md);
+  color: var(--color-deep-navy);
+}
+
+.evidence-panel-floor {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-card-title-weight);
+}
+
+.evidence-panel-note {
+  margin: 0;
+  font-size: var(--type-table-cell-size);
+}
+
+.evidence-panel-dims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.evidence-panel-dim-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.evidence-panel-dim-name {
+  flex: 0 0 140px;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-slate-text);
+}
+
+.evidence-panel-divergence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.evidence-panel-divergence-sentence {
+  margin: 0;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-slate-text);
+}

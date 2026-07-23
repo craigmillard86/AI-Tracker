@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { AssessmentModerationScreen } from '../screens/assessment-moderation/AssessmentModerationScreen';
 import { AssessmentSelfScreen } from '../screens/assessment-self/AssessmentSelfScreen';
+import { BuFormsScreen } from '../screens/bu-forms/BuFormsScreen';
 import { DashboardScreen } from '../screens/dashboard-bu/DashboardScreen';
 import { RegisterDetailScreen } from '../screens/register-detail/RegisterDetailScreen';
 import { RegisterListScreen } from '../screens/register-list/RegisterListScreen';
 import { fetchMe, signOut, type MeResponse } from '../api/client';
 import { strings } from '../strings';
 
-type View = 'dashboard' | 'self' | 'moderation' | 'register' | 'register-detail';
+type View = 'dashboard' | 'self' | 'moderation' | 'register' | 'register-detail' | 'bu-forms';
 
 interface NavEntry {
   label: string;
@@ -22,6 +23,7 @@ const navEntries: ReadonlyArray<NavEntry> = [
   { label: strings.nav.managerReview, view: 'moderation' },
   { label: strings.nav.register, view: 'register' },
   { label: strings.nav.submissions, view: null },
+  { label: strings.nav.buForms, view: 'bu-forms' },
   { label: strings.nav.admin, view: null },
 ];
 
@@ -159,6 +161,7 @@ export function AppShell({ onSignedOut }: AppShellProps): JSX.Element {
           {view === 'register-detail' && selectedInitiativeId && (
             <RegisterDetailScreen initiativeId={selectedInitiativeId} onBack={() => setView('register')} />
           )}
+          {view === 'bu-forms' && <BuFormsScreen />}
         </main>
       </div>
     </div>

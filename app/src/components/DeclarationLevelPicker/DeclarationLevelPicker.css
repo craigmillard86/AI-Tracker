@@ -1,0 +1,49 @@
+/* DeclarationLevelPicker — DESIGN.md A8 (mockup `.levset`/`.levcard`, lighter badge-only variant, see
+   the component's own doc comment). Built exclusively from tokens.css; `.level-badge*` rules live in
+   LevelSelectorCard.css (already loaded globally) and are reused verbatim, not duplicated here. */
+
+.decl-level-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+}
+
+.decl-level-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 1.5px solid var(--color-border-gray);
+  border-radius: var(--radius-card);
+  padding: var(--space-md-sm) var(--space-xs);
+  background: var(--color-pure-white);
+  cursor: pointer;
+  text-align: center;
+}
+
+.decl-level-card:hover {
+  border-color: var(--color-light-teal-accent);
+}
+
+.decl-level-card:focus-within {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}
+
+.decl-level-card-selected {
+  border-color: var(--color-brand-teal);
+  border-width: 2px;
+}
+
+.decl-level-card-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

@@ -1,0 +1,300 @@
+/* BuFormsScreen — DESIGN.md A6 layout; IA per docs/design/mockups/bu-forms.html (binding). Built
+   exclusively from tokens.css; no new colours, radii, shadows, or type sizes. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.bu-forms-head {
+  margin-bottom: var(--space-lg);
+}
+
+.bu-forms-crumb {
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-sm);
+}
+
+.bu-forms-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--type-page-title-size);
+  line-height: var(--type-page-title-line);
+  font-weight: var(--type-page-title-weight);
+  color: var(--color-page-black);
+}
+
+.bu-forms-subtitle {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.bu-forms-status {
+  margin: var(--space-md) 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.bu-forms-status-error {
+  color: var(--color-feedback-error);
+}
+
+.bu-forms-status-success {
+  color: var(--color-feedback-success);
+}
+
+.bu-forms-empty {
+  padding: var(--space-lg) 0;
+}
+
+/* Two-card layout, stacking below the mockup's compact-viewport breakpoint (same convention as
+   AssessmentModerationScreen's `.moderation-layout`). */
+.bu-forms-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: var(--space-lg);
+}
+
+@media (max-width: 1024px) {
+  .bu-forms-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bu-forms-card {
+  background: var(--color-pure-white);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md-lg) var(--space-lg);
+}
+
+.bu-forms-card-head {
+  margin-bottom: var(--space-md-lg);
+}
+
+.bu-forms-card-head h2 {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+}
+
+.bu-forms-hint {
+  margin: 0;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+}
+
+/* Fields. */
+.bu-forms-field {
+  display: block;
+  margin-bottom: var(--space-md);
+}
+
+.bu-forms-field > span:first-child,
+.bu-forms-field > label > span:first-child,
+.bu-forms-field-label {
+  display: block;
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-xs);
+}
+
+.bu-forms-field-help {
+  display: block;
+  font-size: var(--type-label-size);
+  color: var(--color-mid-gray-text);
+  margin-top: var(--space-xs);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: var(--type-body-weight);
+}
+
+.bu-forms-input {
+  width: 100%;
+  font-family: var(--font-family-ui);
+  font-size: var(--type-body-size);
+  color: var(--color-page-black);
+  border: 1px solid var(--color-border-gray);
+  border-radius: var(--radius-input);
+  padding: 9px var(--space-md-sm);
+  background: var(--color-pure-white);
+}
+
+textarea.bu-forms-input {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.bu-forms-input:focus {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 0;
+  border-color: var(--color-brand-teal);
+}
+
+.bu-forms-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--space-lg);
+}
+
+/* RAG chip group (same visual convention as RegisterDetailScreen's composer). */
+.bu-forms-rag-group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-md);
+}
+
+.bu-forms-rag-options {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.bu-forms-rag-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-slate-text);
+  background: var(--color-ice-blue-surface);
+  border-radius: var(--radius-pill);
+  padding: 7px var(--space-md);
+  cursor: pointer;
+}
+
+.bu-forms-rag-option-selected {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}
+
+/* Buttons — one primary per form (mockup `.btn-primary` for the declaration, `.btn-secondary` for the
+   monthly metrics form). 40px height, pill radius per A4/A3. */
+.bu-forms-btn {
+  font-family: var(--font-family-ui);
+  font-weight: var(--type-button-weight);
+  font-size: var(--type-button-size);
+  border-radius: var(--radius-pill);
+  height: 40px;
+  padding: 0 var(--space-lg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bu-forms-btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+.bu-forms-btn-primary {
+  background: var(--color-brand-teal);
+  color: var(--color-pure-white);
+  border: 1.5px solid transparent;
+}
+
+.bu-forms-btn-primary:hover:not(:disabled) {
+  background: var(--color-feedback-info);
+}
+
+.bu-forms-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bu-forms-btn-secondary {
+  background: var(--color-pure-white);
+  color: var(--color-brand-teal);
+  border: 1.5px solid var(--color-brand-teal);
+}
+
+.bu-forms-btn-secondary:hover:not(:disabled) {
+  background: var(--color-light-gray-surface);
+}
+
+.bu-forms-btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Declaration history list. */
+.bu-forms-history {
+  border-top: 1px solid var(--color-light-gray-surface);
+  padding-top: var(--space-md-lg);
+  margin-top: var(--space-md-lg);
+}
+
+.bu-forms-history-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-brand-teal);
+}
+
+.bu-forms-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bu-forms-history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--color-light-gray-surface);
+  font-size: var(--type-table-cell-size);
+  color: var(--color-slate-text);
+}
+
+.bu-forms-history-row:first-child {
+  border-top: 0;
+}
+
+/* Monthly-metrics field groups (mockup `.formgroup`). */
+.bu-forms-formgroup {
+  border: 0;
+  border-top: 1px solid var(--color-light-gray-surface);
+  padding: var(--space-md-lg) 0 0;
+  margin: var(--space-md-lg) 0 0;
+}
+
+.bu-forms-formgroup:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.bu-forms-grouptitle {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-brand-teal);
+  margin-bottom: var(--space-md);
+  padding: 0;
+}
+
+.bu-forms-carry-hint {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-rag-amber-tint);
+  color: var(--color-rag-amber);
+  border-radius: var(--radius-card);
+  font-size: var(--type-table-cell-size);
+}

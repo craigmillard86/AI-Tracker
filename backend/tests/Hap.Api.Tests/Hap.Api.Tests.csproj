@@ -18,4 +18,15 @@
     <ProjectReference Include="..\..\src\Hap.Synth\Hap.Synth.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Host-necessitated (user-approved 2026-07-23): xunit.runner.json caps test parallelism.
+         Hap.Api.Tests spins up WebApplicationFactory in-memory servers; at the CPU-count default
+         many run concurrently and thread-exhaust this shared Windows host ("No more threads can be
+         created in the system"). maxParallelThreads:2 bounds the concurrent server count so verify.sh
+         fits regardless of other host load. Copied to output so the runner picks it up. -->
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

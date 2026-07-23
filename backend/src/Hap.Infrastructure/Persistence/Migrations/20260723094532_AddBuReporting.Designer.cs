@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Hap.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Hap.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(HapDbContext))]
-    partial class HapDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260723094532_AddBuReporting")]
+    partial class AddBuReporting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
