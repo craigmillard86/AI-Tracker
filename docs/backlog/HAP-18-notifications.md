@@ -5,14 +5,36 @@ epic: E3-register
 wave: 2
 fr: [FR-037, FR-057, FR-061]
 risk: L3                # trigger: reclassified 2026-07-23 (was L2) — see notes
-status: in-progress    # bounced back 2026-07-23: L3 re-review panel found a new blocking leak on the fix — see "L3 RE-REVIEW PANEL"
+status: done
 estimate: {dev: M, qa: S}
 worklog:
   - {phase: dev, start: 2026-07-23T15:00:46Z, end: 2026-07-23T15:41:38Z, mins: 40}
   - {phase: qa, start: 2026-07-23T17:59:43Z, end: 2026-07-23T18:15:03Z, mins: 15}
   - {phase: dev, start: 2026-07-23T18:34:24Z, end: 2026-07-23T19:00:58Z, mins: 26}
   - {phase: qa, start: 2026-07-23T19:11:46Z, end: 2026-07-23T19:24:55Z, mins: 13}
-closure: null
+  # Note: the round-1 fix (dev-hap18d) interval was LOST (its verify crashed on host thread-exhaustion
+  # before it could clock out) — logged as nothing per CLAUDE.md §8.7/§12, not reconstructed.
+closure:
+  sha: 1ef38bd
+  date: 2026-07-23
+  risk: L3
+  files: notifications (CycleReminderJob + NotificationJobService + RoleGrantBuLeadResolver + IBuLeadResolver),
+    email (MailKit sender + mailpit ledger + 6 templates), ModerationCompleteNotifier + seam hook,
+    admin run endpoint; 6 test suites; docs/wiki/notifications.md; docs/user-guide/notifications-and-reminders.md
+  tests: "backend Api 523/0/0 (PrivacyReporting slice Api 284 + Arch 14 + Domain 13), Domain 100, Arch 19,
+    Synth 41; frontend 197; merged HAP-15+HAP-18 verify.sh exit 0"
+  panel:
+    - "dev-round L3 (on 241f38d): hap-code-reviewer CHANGES→resolved, hap-domain-specialist SIGN-OFF (3 advisories), hap-red-team NO PATH"
+    - "QA (qa-hap18): found BLOCKING BU-lead recipient leak (depth-label mislabel) — Findings 1 (FR-061, Art. VI) & 2 (FR-037, register)"
+    - "fix-round L3 re-review (on 7002462): hap-code-reviewer CHANGES (2 blocking) + hap-red-team PATH FOUND (1 blocking) — co-grant precedence + reader-eligibility parity gaps; hap-domain-specialist SIGN-OFF"
+    - "fix round 2 (dev-hap18e, 16f38af): bound recipient to full seam predicate (AuthorizeIndividualRead over full grant set) + FR-037 IsActive/non-contractor filter"
+    - "delta L3 re-review (opus, on 4aab002..16f38af): hap-code-reviewer APPROVED (0 blocking), hap-red-team NO PATH FOUND, hap-domain-specialist SIGN-OFF carried"
+    - "QA final (qa-hap18-final): independent verify green + §9.3 no path — PASS"
+  fr_status: "FR-061 delivered; FR-037 delivered; FR-057 PARTIAL (moderation-complete event only of the email-event list — domain advisory A2)"
+  notes: "BU-lead notifications fail-closed DORMANT on synth (Q-035 — no BuDelegate grants seeded). G1 (DR-0009)
+    stands for what it witnessed (app score-reads on synth, notifications dormant); this recipient surface is
+    G1-covered by the seam-parity gate landed here. Q-036 filed (seam FirstOrDefault multi-BU-delegate under-grant,
+    QA non-blocking observation). Open owner items: Q-034 (nag day-7/8), Q-035 (seed BuDelegate on synth?), Q-036."
 ---
 ## Story
 As a non-responder, an overdue initiative owner, or an escalation recipient, I receive the right email at the right threshold — deterministic in test via an admin trigger, all captured in mailpit, none ever external.
