@@ -5,12 +5,22 @@ epic: E3-register
 wave: 2
 fr: [FR-028, FR-029, FR-030, FR-031, FR-032, FR-033]
 risk: L2                # trigger: EF migrations/schema (NR aggregation itself is HAP-16)
-status: qa
+status: done
 estimate: {dev: L, qa: M}
 worklog:
+  # original dev interval LOST (agent died pre-clock-out, §8.7 — see notes); only the
+  # post-panel fix round (23m) and QA (27m) are honestly timestamped.
   - {phase: dev, start: 2026-07-23T08:10:02Z, end: 2026-07-23T08:33:15Z, mins: 23}
   - {phase: qa, start: 2026-07-23T08:38:14Z, end: 2026-07-23T09:06:08Z, mins: 27}
-closure: null
+closure:
+  sha: 5bc62024fbddeabe7d6f886a9119e25878702b40
+  date: 2026-07-23
+  risk: L2
+  files: 34
+  tests: "verify.sh ALL GREEN on branch (Api 452/452, PrivacyReporting 268/268, frontend 170/170, migration #7 idempotent); integration on merged main green (frontend 179/179 with HAP-13+HAP-23+HAP-14 together, typecheck/lint/build). Backend unchanged from branch-verified tree (no backend merge conflict)."
+  panel: [hap-code-reviewer, hap-domain-specialist, hap-design-reviewer]
+  qa: "PASS (fresh hap-qa) — 13 adversarial tests; stage machine, append-only, NR-line 409 guard, §4.2 no-approval, authority reuse, concurrency-409 all attacked, no bypass. §9.3 N/A (no assessment/Authorization/rollup path — register detail data)."
+  notes: "Recovered after dev-hap14 died post-green-verify (lead committed verified tree). Two fix rounds: (1) overdue stage-gate + tokens-only callout + A1 concurrency-409/A2/A3/A5; (2) NRLineEditor button 28->32px (A4). Design review added post-QA (initial panel omitted it — corrected before closure). Q-030 filed (StageTimeline A8-vs-mockup dot colour, design-owner decision). AppShell merge conflict with HAP-23 resolved keeping both."
 ---
 ## Story
 As an initiative owner or BU Lead, I manage one initiative in full — immutable forward-only stage history, NR lines, governance fields, customer counts, and a sub-minute weekly RAG update — so Harris reporting has trustworthy raw material.
@@ -25,16 +35,16 @@ As an initiative owner or BU Lead, I manage one initiative in full — immutable
 - Parallelisable: no
 
 ## Acceptance criteria
-- [ ] `POST /api/initiatives/{id}/stage`: forward transitions append history rows with entered_at/by; backward → 409; Retired is terminal (further transitions 409) and the history row records prior_stage (FR-028 tests per transition).
-- [ ] Stage history has no UPDATE/DELETE path (EF mapping + architecture-test assertion, same pattern as AuditLog).
-- [ ] `POST /api/initiatives/{id}/updates` records RAG + note; `last_update_at` refreshes; update trail returned newest-first on the detail endpoint (FR-033).
-- [ ] NR lines: add with year/direction/recurrence/amount/description; delete allowed until referenced by a persisted monthly submission → then 409 (guard test stubs a submission row shape; full flow retested in HAP-16).
-- [ ] Governance fields persist and render read/write per FR-030 with the §4.2 informational-only copy shown (no approval semantics anywhere — route/permission test that no approval state blocks any operation).
-- [ ] Customers count editable for customer-deployed categories only (HarrisCategory flag drives it — test both category kinds).
-- [ ] UI implements the mockup: identity/tech card, dimensions-advanced chips, NRLineEditor (Direct/Indirect × One-Time/Recurring rows, right-aligned $), governance card, StageTimeline (ordered, dates printed, no interactive states), weekly update composer (RAG select + one-line note + submit), 11-day overdue banner state, red-RAG state.
-- [ ] vitest-axe passes; strings externalised; tokens only.
-- [ ] Wiki/guide (DR-0003, at closure): extend `docs/wiki/register.md` + `docs/user-guide/initiative-register.md` (detail/update portions).
-- [ ] `./scripts/verify.sh` green (migration idempotent).
+- [x] `POST /api/initiatives/{id}/stage`: forward transitions append history rows with entered_at/by; backward → 409; Retired is terminal (further transitions 409) and the history row records prior_stage (FR-028 tests per transition).
+- [x] Stage history has no UPDATE/DELETE path (EF mapping + architecture-test assertion, same pattern as AuditLog).
+- [x] `POST /api/initiatives/{id}/updates` records RAG + note; `last_update_at` refreshes; update trail returned newest-first on the detail endpoint (FR-033).
+- [x] NR lines: add with year/direction/recurrence/amount/description; delete allowed until referenced by a persisted monthly submission → then 409 (guard test stubs a submission row shape; full flow retested in HAP-16).
+- [x] Governance fields persist and render read/write per FR-030 with the §4.2 informational-only copy shown (no approval semantics anywhere — route/permission test that no approval state blocks any operation).
+- [x] Customers count editable for customer-deployed categories only (HarrisCategory flag drives it — test both category kinds).
+- [x] UI implements the mockup: identity/tech card, dimensions-advanced chips, NRLineEditor (Direct/Indirect × One-Time/Recurring rows, right-aligned $), governance card, StageTimeline (ordered, dates printed, no interactive states), weekly update composer (RAG select + one-line note + submit), 11-day overdue banner state, red-RAG state.
+- [x] vitest-axe passes; strings externalised; tokens only.
+- [x] Wiki/guide (DR-0003, at closure): extend `docs/wiki/register.md` + `docs/user-guide/initiative-register.md` (detail/update portions).
+- [x] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
 

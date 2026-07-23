@@ -1,6 +1,6 @@
 # Initiative register — as built
 
-_Subsystem shipped by HAP-13 (core + list UI). Stage progression, NR/updates, and nag jobs are HAP-14/HAP-18 — this page will be extended there. Describes shipped behaviour only; WHAT/WHY live in `docs/spec/` + `specs/`, decisions in `docs/decisions/`._
+_Subsystem shipped by HAP-13 (core + list UI) and HAP-14 (detail: stage history, weekly updates, NR lines). Nag jobs that act on staleness/overdue are HAP-18. Describes shipped behaviour only; WHAT/WHY live in `docs/spec/` + `specs/`, decisions in `docs/decisions/`._
 
 ## Domain (HAP-13 — FR-026/027/034/035)
 
@@ -41,3 +41,29 @@ Per `register-list.html`: an A4 DataTable (sticky header, right-aligned numerics
 - **StaleRowFlag** (`components/StaleRowFlag`) renders from `LastUpdateAt`: amber >7d, red >14d, with the day-count in text (nag jobs that act on staleness are HAP-18).
 - **LevelBadge** always prints the level number (`L{n}`); **RagChip** always carries a text label — colour is reinforcement only, never the sole signal (A2 colour-independence, component tests).
 - vitest-axe clean; strings externalised (`en.ts`); tokens-only styling.
+
+## Initiative detail — stage history, weekly updates, NR lines (HAP-14 — FR-028/029/030/031/032/033)
+
+Migration **#7** (`20260723022617_AddInitiativeDetailTracking`) adds three append/child tables and an `xmin` concurrency token on `initiatives`. Endpoints live in `RegisterEndpoints.cs`; all four writes reuse HAP-13's `CanEditAsync` authority (owner/creator/BU-Lead-of-BU).
+
+### Stage machine (FR-028) — forward-only, append-only history
+
+`InitiativeStage` ordinal order is Idea < Evaluation < Pilot < Production < Scaled < Retired. `POST /api/initiatives/{id}/stage` appends an **`InitiativeStageHistory`** row (`entered_at`/`entered_by`, and `prior_stage` on every row after the initial Idea row — feeds FR-064's "stage held when retired"). Rules: a backward or same-stage target → **409**; **Retired is terminal** (any further transition → 409); multi-step forward jumps are allowed (spec: forward-only ≠ one-step-at-a-time). Corrections are new forward transitions, never edits. `InitiativeStageHistory` is **append-only** — get-only entity, no DbSet mutation path, enforced by `InitiativeStageHistoryAppendOnlyTests` (reflection + source-scan, `PrivacyReporting`-tagged, mirroring the AuditLog guard; no DB trigger by design — a documented L2-vs-L3 scope call).
+
+**Concurrency (xmin):** `initiatives` carries a `uint xmin` rowversion token; two concurrent stage transitions that both read the same `CurrentStage` can't both commit — the loser gets `DbUpdateConcurrencyException` mapped to **409**, protecting the forward-only guarantee against a race.
+
+### Weekly updates (FR-033)
+
+`POST /api/initiatives/{id}/updates` records a RAG status + one-line note as an **`InitiativeWeeklyUpdate`** row, refreshes `LastUpdateAt` (one shared timestamp for both the update row and the parent, so they never drift), and the detail endpoint returns the update trail **newest-first**. The register-detail UI's **overdue** banner is **stage-gated** to active stages only (Evaluation/Pilot/Production/Scaled) — Idea and Retired are exempt per §4.2, so a new Idea-stage initiative never shows a false "overdue" nag.
+
+### NR lines (FR-029) + Harris reconciliation guard
+
+**`InitiativeNRLine`** captures Direct/Indirect × One-Time/Recurring value with year/amount/description. Delete is allowed **until the line is referenced by a persisted monthly submission** (`ReferencedBySubmissionLineId` non-null → **409**); the guard ships here even though submissions arrive in HAP-16, protecting the sacred Harris reconcile-to-records rule (a reported figure can't lose its underlying row).
+
+### Governance is informational only (FR-030, §4.2)
+
+Governance/risk fields (`DataSensitivity`, approval status, Cogito/tech) **persist and render but gate nothing** — the register is not an approval workflow. No code path reads an approval field to block a stage transition, update, or NR operation (proved by `AC30_no_approval_status_value_ever_blocks_any_write_operation`). Customer count is editable only for **customer-deployed** HarrisCategory kinds.
+
+### UI (`app/src/screens/register-detail`, components `StageTimeline`/`NRLineEditor`)
+
+Per `register-detail.html`: identity/tech card, dimensions-advanced chips, **StageTimeline** (ordered, dates printed, brand-teal current node per DESIGN.md A8 — the mockup's red-dot demo is illustrative, see Q-030; no interactive states), **NRLineEditor** (Direct/Indirect × One-Time/Recurring rows, right-aligned $), governance card, weekly-update composer, the overdue banner, and the red-RAG state (conveyed by the identity-card RagChip). Tokens-only, strings externalised, vitest-axe clean.
