@@ -33,7 +33,13 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
 
 PG_PORT=$(( (RANDOM % 20000) + 20000 ))
-PG_NAME="hap-verify-$$"
+# Collision-proof container name: $$ (PID) alone is NOT unique under heavy
+# concurrent-agent load — the OS reuses PIDs, so an unrelated bash process can
+# compute the same "hap-verify-$$" and its EXIT-trap `docker rm -f` rips out a
+# DIFFERENT run's still-live container (observed: an explicit kill signal=9 mid-run,
+# not an OOM reaper). Add $RANDOM entropy so each invocation's name is unique and
+# a PID-reused process's cleanup can only ever target its own (absent) container.
+PG_NAME="hap-verify-$$-${RANDOM}${RANDOM}"
 
 cleanup() {
   docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
