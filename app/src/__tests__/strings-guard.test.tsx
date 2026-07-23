@@ -30,7 +30,7 @@ describe('externalised strings (FR-067)', () => {
   it('every visible shell text node comes from the strings module', async () => {
     installNoCycleFetchMock();
 
-    const { container } = render(<AppShell />);
+    const { container } = render(<AppShell onSignedOut={() => {}} />);
     await screen.findByText(strings.assessment.noOpenCycleTitle);
 
     const known = new Set(

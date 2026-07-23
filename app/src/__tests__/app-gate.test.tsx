@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import { strings } from '../strings';
@@ -55,5 +55,52 @@ describe('App session gate (FR-055)', () => {
     render(<App />);
 
     expect(await screen.findByText(strings.appName)).toBeTruthy();
+  });
+
+  /** QA (HAP-23): AC-2's actual claim is an App-level round trip — sign out returns the app to the
+   * sign-in role-picker with no stale authenticated view left behind. Every existing test exercises
+   * either AppShell alone (mocking `onSignedOut`, never asserting what the real callback — flipping
+   * App's own session state — produces) or App's initial gating in isolation. Nothing before this
+   * rendered App, signed out, and checked the shell was actually replaced by the picker. Uses the
+   * same fetch mock App already relies on to re-run its `checkSession` (`GET /api/me`) after
+   * sign-out — post-signout that must resolve unauthenticated for the picker to render as the
+   * genuine outcome of the state flip, not just a click handler firing. */
+  it('signing out from the shell returns the app to the sign-in role-picker, with the shell gone (HAP-23, AC-2 round trip)', async () => {
+    let signedOut = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        if (url === '/api/me') {
+          return Promise.resolve(
+            signedOut
+              ? new Response(null, { status: 401 })
+              : new Response(JSON.stringify(meResponse), { status: 200 }),
+          );
+        }
+        if (url === '/auth/signout' && init?.method === 'POST') {
+          signedOut = true;
+          return Promise.resolve(new Response('', { status: 200 }));
+        }
+        if (url === '/api/me/assessment') {
+          return Promise.resolve(new Response('', { status: 404 }));
+        }
+        if (url === '/auth/signin') {
+          // SignInScreen's own mount fetch once the picker is showing.
+          return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+        }
+        return Promise.reject(new Error(`unexpected fetch ${String(init?.method)} ${url}`));
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText(strings.appName)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: strings.shell.signOut }));
+
+    expect(await screen.findByText(strings.signIn.title)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText(strings.appName)).toBeNull());
+    expect(screen.queryByRole('button', { name: strings.shell.signOut })).toBeNull();
   });
 });

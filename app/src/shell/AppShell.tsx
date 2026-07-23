@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { AssessmentModerationScreen } from '../screens/assessment-moderation/AssessmentModerationScreen';
 import { AssessmentSelfScreen } from '../screens/assessment-self/AssessmentSelfScreen';
 import { DashboardScreen } from '../screens/dashboard-bu/DashboardScreen';
 import { RegisterListScreen } from '../screens/register-list/RegisterListScreen';
+import { fetchMe, signOut, type MeResponse } from '../api/client';
 import { strings } from '../strings';
 
 type View = 'dashboard' | 'self' | 'moderation' | 'register';
@@ -23,6 +24,33 @@ const navEntries: ReadonlyArray<NavEntry> = [
   { label: strings.nav.admin, view: null },
 ];
 
+/** Human-readable labels for the explicit `OrgRole` grants `GET /api/me` returns as raw C# enum
+ * names (`Hap.Domain.Org.OrgRole`; see `LocalDevProvider.ExplicitRoleBySeedLabel` for the mirrored
+ * server-side seed mapping). Hierarchy-derived roles (`HierarchyRoleResolver.ToRoleNames`) already
+ * come back display-ready and need no mapping. */
+const explicitRoleLabels: Record<string, string> = {
+  PlatformAdmin: strings.shell.roleLabelPlatformAdmin,
+  HigExecutive: strings.shell.roleLabelHigExecutive,
+  BuDelegate: strings.shell.roleLabelBuDelegate,
+  GroupViewer: strings.shell.roleLabelGroupViewer,
+};
+
+/** "Display name (role, role)" for the top bar; a person with no explicit or hierarchy-derived role
+ * (a plain individual contributor) falls back to `individualRoleLabel` rather than showing nothing. */
+function formatIdentity(me: MeResponse): string {
+  const roles = [...me.explicitRoles.map((role) => explicitRoleLabels[role] ?? role), ...me.computedRoles];
+  const roleText = roles.length > 0 ? roles.join(', ') : strings.shell.individualRoleLabel;
+  return `${me.displayName} (${roleText})`;
+}
+
+interface AppShellProps {
+  /** Called once sign-out completes (successfully or not — see handleSignOut below) so the caller
+   * (App, FR-055's session gate) can return to the sign-in role-picker. AppShell itself unmounts when
+   * that happens, which is what actually clears the fetched identity from memory — there is no
+   * separate "clear" step here. */
+  onSignedOut: () => void;
+}
+
 /**
  * The application frame per DESIGN.md A6: fixed deep-navy top bar, deep-navy left
  * nav, and a light content surface. A plain `useState` view switch (no router library — HAP-9)
@@ -32,9 +60,39 @@ const navEntries: ReadonlyArray<NavEntry> = [
  * items stay native `<a>` elements (role="link") with `aria-current="page"` on the active one — the
  * default-prevented click swaps the view without a real navigation. All chrome copy comes from the
  * externalised strings module (FR-067).
+ *
+ * The top bar also owns the caller's live identity (HAP-23; FR-055/FR-056): it fetches `GET /api/me`
+ * itself on mount — independently of App's own session-gate fetch — so the shell has no dependency on
+ * how its parent got here, and falls back to `identityUnavailable` if that fetch fails rather than
+ * leaving stale or hard-coded copy on screen. The sign-out button calls the existing `signOut()`
+ * (`POST /auth/signout`) and always hands control back to `onSignedOut`, even if the network call
+ * itself fails — a best-effort local sign-out beats a stuck authenticated view.
  */
-export function AppShell(): JSX.Element {
+export function AppShell({ onSignedOut }: AppShellProps): JSX.Element {
   const [view, setView] = useState<View>('self');
+  const [me, setMe] = useState<MeResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMe()
+      .then((response) => {
+        if (!cancelled) {
+          setMe(response);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMe(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSignOut = useCallback((): void => {
+    void signOut().finally(onSignedOut);
+  }, [onSignedOut]);
 
   function handleNavClick(entry: NavEntry, event: MouseEvent<HTMLAnchorElement>): void {
     if (entry.view === null) {
@@ -52,10 +110,15 @@ export function AppShell(): JSX.Element {
 
       <header className="app-topbar">
         <span className="app-brand">{strings.appName}</span>
-        <span className="app-user">
-          <span className="app-user-label">{strings.shell.signedInAs}</span>{' '}
-          <span className="app-user-role">{strings.shell.rolePlaceholder}</span>
-        </span>
+        <div className="app-topbar-identity">
+          <span className="app-user">
+            <span className="app-user-label">{strings.shell.signedInAs}</span>{' '}
+            <span className="app-user-role">{me ? formatIdentity(me) : strings.shell.identityUnavailable}</span>
+          </span>
+          <button type="button" className="app-signout" onClick={handleSignOut}>
+            {strings.shell.signOut}
+          </button>
+        </div>
       </header>
 
       <div className="app-body">

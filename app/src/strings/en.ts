@@ -10,8 +10,14 @@ export const en = {
   shell: {
     primaryNav: 'Primary',
     signedInAs: 'Signed in as',
-    rolePlaceholder: 'Platform Admin',
+    identityUnavailable: 'Identity unavailable',
+    individualRoleLabel: 'Individual',
+    roleLabelPlatformAdmin: 'Platform Admin',
+    roleLabelHigExecutive: 'HIG Executive',
+    roleLabelBuDelegate: 'BU Delegate',
+    roleLabelGroupViewer: 'Group Viewer',
     skipToContent: 'Skip to main content',
+    signOut: 'Sign out',
   },
   nav: {
     dashboard: 'Dashboard',

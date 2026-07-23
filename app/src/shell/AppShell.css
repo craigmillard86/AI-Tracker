@@ -55,12 +55,38 @@ body {
   font-weight: var(--type-card-title-weight);
 }
 
+.app-topbar-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
 .app-user {
   font-size: var(--type-table-cell-size);
 }
 
 .app-user-label {
   color: var(--color-light-teal-accent);
+}
+
+/* Outline/secondary button (DESIGN.md A4) on the deep-navy top bar — light-teal-accent border, the
+ * same token already proven legible on this background by .app-user-label above. */
+.app-signout {
+  font-family: inherit;
+  font-size: var(--type-button-size);
+  font-weight: var(--type-button-weight);
+  height: 40px;
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-light-teal-accent);
+  background: transparent;
+  color: var(--color-pure-white);
+  cursor: pointer;
+}
+
+.app-signout:hover {
+  background: var(--color-brand-teal);
+  border-color: var(--color-brand-teal);
 }
 
 .app-body {
