@@ -1,0 +1,24 @@
+/* StaleRowFlag — DESIGN.md A8. Built exclusively from tokens.css; no new colours, radii, shadows, or
+   type sizes. Amber (>7d) / red (>14d) tint chip; the day count is always the visible text. */
+
+.stale-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-button-weight);
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.stale-flag-amber {
+  background: var(--color-rag-amber-tint);
+  color: var(--color-rag-amber);
+}
+
+.stale-flag-red {
+  background: var(--color-rag-red-tint);
+  color: var(--color-rag-red);
+}

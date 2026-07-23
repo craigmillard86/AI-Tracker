@@ -19,9 +19,13 @@ import './components/StatTile/StatTile.css';
 import './components/DimensionBar/DimensionBar.css';
 import './components/TrendSparkline/TrendSparkline.css';
 import './components/SuppressedCell/SuppressedCell.css';
+import './components/StaleRowFlag/StaleRowFlag.css';
+import './components/LevelBadge/LevelBadge.css';
+import './components/RagChip/RagChip.css';
 import './screens/assessment-self/AssessmentSelfScreen.css';
 import './screens/assessment-moderation/AssessmentModerationScreen.css';
 import './screens/dashboard-bu/DashboardScreen.css';
+import './screens/register-list/RegisterListScreen.css';
 import { App } from './App';
 
 const rootElement = document.getElementById('root');

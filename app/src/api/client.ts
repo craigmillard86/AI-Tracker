@@ -419,3 +419,120 @@ export async function fetchOrgRollup(nodeType: string, nodeId?: string): Promise
   }
   return (await response.json()) as NodeAggregate;
 }
+
+/**
+ * Initiative register endpoints (HAP-13; contracts/api.md "Register"; FR-026/027/034/035). The register
+ * is NOT visibility-seam-gated — it holds initiative data, not individual assessment data — so every
+ * authenticated role may READ it. These read wrappers back the list UI; create/edit + the detail screen
+ * are HAP-14. Types mirror `Hap.Api.RegisterEndpoints`' response records exactly (System.Text.Json
+ * camelCase). The stage/RAG/risk unions mirror the backend enums (`InitiativeStage`, `HarrisStage`,
+ * `RagStatus`, `RiskTier`) — internal state names, not framework/taxonomy content.
+ */
+
+export type InitiativeStage = 'Idea' | 'Evaluation' | 'Pilot' | 'Production' | 'Scaled' | 'Retired';
+export type HarrisStage = 'Ideation' | 'Development' | 'Production' | 'IdeasTriedButStopped';
+export type RagStatus = 'OnTrack' | 'AtRisk' | 'OffTrack';
+export type RiskTier = 'Low' | 'Med' | 'High';
+
+/** GET /api/business-units item — reference data for the BU filter/select. */
+export interface BusinessUnitResponse {
+  id: string;
+  code: string;
+  name: string;
+}
+
+/** GET /api/harris-categories item (FR-027) — reference data for the category filter/select. */
+export interface HarrisCategoryResponse {
+  id: string;
+  key: string;
+  name: string;
+  groupReported: boolean;
+  customerDeployed: boolean;
+}
+
+/** One register row (FR-026). `harrisStage` is the Harris-mapped label the list shows next to the
+ * internal stage (Stage → Harris); null only if the stage map lacks a row (never in a seeded env). */
+export interface InitiativeResponse {
+  id: string;
+  businessUnitId: string;
+  name: string;
+  description: string | null;
+  sponsorPersonId: string | null;
+  ownerPersonId: string;
+  createdByPersonId: string;
+  registeredAt: string;
+  categoryId: string;
+  aiDlcLevel: number;
+  functionsAffected: string[];
+  dimensionsAdvanced: string[];
+  currentStage: InitiativeStage;
+  harrisStage: HarrisStage | null;
+  ragStatus: RagStatus;
+  lastUpdateAt: string;
+  customersInProduction: number | null;
+  riskTier: RiskTier;
+}
+
+/** Server-side facets for GET /api/initiatives (FR-035). All optional; omitted params are not sent.
+ * The mockup's RAG filter has no server param, so it is applied client-side in the list screen. */
+export interface InitiativeQuery {
+  search?: string;
+  bu?: string;
+  category?: string;
+  stage?: string;
+  riskTier?: string;
+  aiDlcLevel?: number;
+  dimension?: string;
+}
+
+/** GET /api/business-units — every authenticated role may read (non-seam-gated reference data). */
+export async function fetchBusinessUnits(): Promise<BusinessUnitResponse[]> {
+  const response = await fetch('/api/business-units');
+  if (!response.ok) {
+    throw new Error(`GET /api/business-units failed (${response.status})`);
+  }
+  return (await response.json()) as BusinessUnitResponse[];
+}
+
+/** GET /api/harris-categories — reference data for the register filters (FR-027). */
+export async function fetchHarrisCategories(): Promise<HarrisCategoryResponse[]> {
+  const response = await fetch('/api/harris-categories');
+  if (!response.ok) {
+    throw new Error(`GET /api/harris-categories failed (${response.status})`);
+  }
+  return (await response.json()) as HarrisCategoryResponse[];
+}
+
+/** GET /api/initiatives — full-text search + facets (FR-035). Results arrive sorted by last update
+ * (newest first) server-side. Only the set facets are appended to the query string. */
+export async function fetchInitiatives(query: InitiativeQuery = {}): Promise<InitiativeResponse[]> {
+  const params = new URLSearchParams();
+  if (query.search && query.search.trim()) {
+    params.set('search', query.search.trim());
+  }
+  if (query.bu) {
+    params.set('bu', query.bu);
+  }
+  if (query.category) {
+    params.set('category', query.category);
+  }
+  if (query.stage) {
+    params.set('stage', query.stage);
+  }
+  if (query.riskTier) {
+    params.set('riskTier', query.riskTier);
+  }
+  if (query.aiDlcLevel != null) {
+    params.set('aiDlcLevel', String(query.aiDlcLevel));
+  }
+  if (query.dimension) {
+    params.set('dimension', query.dimension);
+  }
+  const qs = params.toString();
+  const path = qs ? `/api/initiatives?${qs}` : '/api/initiatives';
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`GET ${path} failed (${response.status})`);
+  }
+  return (await response.json()) as InitiativeResponse[];
+}

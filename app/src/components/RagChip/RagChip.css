@@ -1,0 +1,48 @@
+/* RagChip — DESIGN.md A2 (RAG status). Built exclusively from tokens.css; no new colours, radii,
+   shadows, or type sizes. A tinted pill with a coloured dot + the always-printed status label. */
+
+.rag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+  white-space: nowrap;
+}
+
+.rag-chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.rag-chip-green {
+  background: var(--color-rag-green-tint);
+  color: var(--color-rag-green);
+}
+
+.rag-chip-green::before {
+  background: var(--color-rag-green);
+}
+
+.rag-chip-amber {
+  background: var(--color-rag-amber-tint);
+  color: var(--color-rag-amber);
+}
+
+.rag-chip-amber::before {
+  background: var(--color-rag-amber);
+}
+
+.rag-chip-red {
+  background: var(--color-rag-red-tint);
+  color: var(--color-rag-red);
+}
+
+.rag-chip-red::before {
+  background: var(--color-rag-red);
+}

@@ -1,0 +1,23 @@
+{
+  "taxonomy": "Harris AI Initiative Taxonomy",
+  "key": "harris-taxonomy",
+  "version": 1,
+  "owner": "Craig Millard (Vanguard / HIG AI)",
+  "source": "docs/spec/hig-ai-maturity-platform-specification.md — Module 2 (FR-027) + Harris AI Dashboard stage mapping (FR-064)",
+  "notes": "Harris reporting categories and the internal-stage -> Harris-stage map, held as DATA per constitution Art. II.4. group_reported is false only for the 'Other' category (FR-044 exclusion). customer_deployed marks categories whose initiatives carry a customers-in-production count (FR-031); internal categories do not.",
+  "categories": [
+    { "key": "ai-product-feature",        "name": "AI Product Feature",        "group_reported": true,  "customer_deployed": true  },
+    { "key": "pre-built-agent-customer",   "name": "Pre-Built Agent (cust.)",   "group_reported": true,  "customer_deployed": true  },
+    { "key": "custom-agent-customer",      "name": "Custom Agent (cust.)",      "group_reported": true,  "customer_deployed": true  },
+    { "key": "digital-worker-internal",    "name": "Digital Worker (internal)", "group_reported": true,  "customer_deployed": false },
+    { "key": "other-internal",             "name": "Other (internal)",          "group_reported": false, "customer_deployed": false }
+  ],
+  "stageMap": [
+    { "internal_stage": "Idea",       "harris_stage": "Ideation" },
+    { "internal_stage": "Evaluation", "harris_stage": "Ideation" },
+    { "internal_stage": "Pilot",      "harris_stage": "Development" },
+    { "internal_stage": "Production", "harris_stage": "Production" },
+    { "internal_stage": "Scaled",     "harris_stage": "Production" },
+    { "internal_stage": "Retired",    "harris_stage": "IdeasTriedButStopped" }
+  ]
+}

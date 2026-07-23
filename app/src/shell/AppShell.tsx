@@ -3,9 +3,10 @@ import type { MouseEvent } from 'react';
 import { AssessmentModerationScreen } from '../screens/assessment-moderation/AssessmentModerationScreen';
 import { AssessmentSelfScreen } from '../screens/assessment-self/AssessmentSelfScreen';
 import { DashboardScreen } from '../screens/dashboard-bu/DashboardScreen';
+import { RegisterListScreen } from '../screens/register-list/RegisterListScreen';
 import { strings } from '../strings';
 
-type View = 'dashboard' | 'self' | 'moderation';
+type View = 'dashboard' | 'self' | 'moderation' | 'register';
 
 interface NavEntry {
   label: string;
@@ -17,7 +18,7 @@ const navEntries: ReadonlyArray<NavEntry> = [
   { label: strings.nav.dashboard, view: 'dashboard' },
   { label: strings.nav.selfAssessment, view: 'self' },
   { label: strings.nav.managerReview, view: 'moderation' },
-  { label: strings.nav.register, view: null },
+  { label: strings.nav.register, view: 'register' },
   { label: strings.nav.submissions, view: null },
   { label: strings.nav.admin, view: null },
 ];
@@ -79,6 +80,7 @@ export function AppShell(): JSX.Element {
           {view === 'dashboard' && <DashboardScreen onStartSelfAssessment={() => setView('self')} />}
           {view === 'self' && <AssessmentSelfScreen />}
           {view === 'moderation' && <AssessmentModerationScreen />}
+          {view === 'register' && <RegisterListScreen />}
         </main>
       </div>
     </div>

@@ -198,4 +198,75 @@ export const en = {
     // of a rounded mean (BB1). "% at L1+" surfaces a team stuck at L0 that a rounded mean would hide.
     floorBreakdown: (pctAbove: number, pctZero: number): string => `${pctAbove}% at L1+ · ${pctZero}% at L0`,
   },
+  register: {
+    breadcrumb: 'Initiative register',
+    pageTitle: 'AI initiative register',
+    subtitle: 'Harris-aligned taxonomy · stage, AI-DLC level and RAG captured per initiative',
+    newInitiative: 'New initiative',
+    loading: 'Loading the initiative register…',
+    loadError: 'Could not load the initiative register. Is the API running?',
+    emptyTitle: 'No initiatives to show',
+    emptyBody:
+      'No initiatives match the current filters. Adjust or clear the filters, or register the first initiative for your BU.',
+    // Filters panel
+    filtersLabel: 'Filter initiatives',
+    searchLabel: 'Search',
+    searchPlaceholder: 'Name or description…',
+    buLabel: 'BU',
+    buAll: 'All BUs',
+    categoryLabel: 'Harris category',
+    categoryAll: 'All categories',
+    stageLabel: 'Stage',
+    stageAll: 'All stages',
+    ragLabel: 'RAG',
+    ragAll: 'Any',
+    // Results card
+    cardTitle: 'All initiatives',
+    resultSummary: (count: number): string => `${count} initiative${count === 1 ? '' : 's'}`,
+    staleSummary: (count: number): string => `${count} stale (no update in over 7 days)`,
+    sortedNote: 'sorted by last update',
+    legendLabel: 'AI-DLC level',
+    // Table column headers
+    colInitiative: 'Initiative',
+    colBu: 'BU',
+    colCategory: 'Harris category',
+    colStage: 'Stage → Harris',
+    colLevel: 'AI-DLC',
+    colRag: 'RAG',
+    colCustomers: 'Customers',
+    colLastUpdate: 'Last update',
+    // Cell values
+    emptyValue: '—',
+    unknownBu: 'Unknown BU',
+    unknownCategory: 'Uncategorised',
+    stageArrow: (stage: string, harris: string): string => `${stage} → ${harris}`,
+    lastUpdateAgo: (days: number): string => (days <= 0 ? 'today' : `${days}d ago`),
+    staleFlag: (days: number): string => `${days}d stale`,
+    // Enum → display label maps. These are internal state names (not framework/taxonomy content):
+    // the wire values ('Idea', 'OnTrack', …) are attribute values; only these labels are shown.
+    stageLabels: {
+      Idea: 'Idea',
+      Evaluation: 'Evaluation',
+      Pilot: 'Pilot',
+      Production: 'Production',
+      Scaled: 'Scaled',
+      Retired: 'Retired',
+    },
+    harrisStageLabels: {
+      Ideation: 'Ideation',
+      Development: 'Development',
+      Production: 'Production',
+      IdeasTriedButStopped: 'Stopped',
+    },
+    ragLabels: {
+      OnTrack: 'On Track',
+      AtRisk: 'At Risk',
+      OffTrack: 'Off Track',
+    },
+    // Pagination (DataTable paginates above 25 rows — DESIGN.md A4)
+    paginationStatus: (current: number, total: number): string => `Page ${current} of ${total}`,
+    paginationPrev: 'Previous',
+    paginationNext: 'Next',
+    paginationHint: 'Paginated at more than 25 rows.',
+  },
 } as const;

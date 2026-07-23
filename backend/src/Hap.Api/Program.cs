@@ -3,6 +3,7 @@ using Hap.Api.Authorization;
 using Hap.Api.Identity;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Frameworks;
+using Hap.Infrastructure.Register;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,7 +31,14 @@ var frameworkDefinitionPath =
     ?? Environment.GetEnvironmentVariable("HAP_FRAMEWORK_DEFINITION")
     ?? FrameworkDefinitionLocator.ResolveDefaultPath();
 
-builder.Services.AddHapInfrastructure(snapshotPath, frameworkDefinitionPath);
+// Path to the seeded Harris taxonomy JSON (docs/frameworks/harris-taxonomy.v1.json). Same
+// override-then-fallback shape as the framework definition above (HAP-13, FR-027/FR-064).
+var harrisTaxonomyDefinitionPath =
+    builder.Configuration["Hap:HarrisTaxonomyDefinitionPath"]
+    ?? Environment.GetEnvironmentVariable("HAP_HARRIS_TAXONOMY_DEFINITION")
+    ?? HarrisTaxonomyDefinitionLocator.ResolveDefaultPath();
+
+builder.Services.AddHapInfrastructure(snapshotPath, frameworkDefinitionPath, harrisTaxonomyDefinitionPath);
 
 // Path to the seed-users file (scripts/synth/generate.sh output) the local dev provider's
 // role-picker reads (FR-055). Same configurable-path convention as the directory snapshot above.
@@ -65,6 +73,7 @@ api.MapCycleEndpoints();
 api.MapAssessmentEndpoints();
 api.MapTeamEndpoints();
 api.MapRollupEndpoints();
+api.MapRegisterEndpoints();
 
 app.Run();
 

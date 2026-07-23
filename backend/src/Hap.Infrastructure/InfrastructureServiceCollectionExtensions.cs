@@ -2,6 +2,7 @@ using Hap.Infrastructure.Audit;
 using Hap.Infrastructure.Cycles;
 using Hap.Infrastructure.Directory;
 using Hap.Infrastructure.Frameworks;
+using Hap.Infrastructure.Register;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Hap.Infrastructure;
@@ -12,7 +13,10 @@ namespace Hap.Infrastructure;
 public static class InfrastructureServiceCollectionExtensions
 {
     public static IServiceCollection AddHapInfrastructure(
-        this IServiceCollection services, string directorySnapshotPath, string frameworkDefinitionPath)
+        this IServiceCollection services,
+        string directorySnapshotPath,
+        string frameworkDefinitionPath,
+        string harrisTaxonomyDefinitionPath)
     {
         services.AddScoped<IAuditWriter, AuditWriter>();
         services.AddScoped<IDirectorySource>(_ => new SyntheticDirectoryAdapter(directorySnapshotPath));
@@ -21,6 +25,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped(sp => new FrameworkSeeder(sp.GetRequiredService<HapDbContext>(), frameworkDefinitionPath));
         services.AddScoped<FrameworkAdminService>();
         services.AddScoped<CycleService>();
+        services.AddScoped(sp =>
+            new HarrisTaxonomySeeder(sp.GetRequiredService<HapDbContext>(), harrisTaxonomyDefinitionPath));
         return services;
     }
 }

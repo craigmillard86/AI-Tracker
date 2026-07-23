@@ -46,6 +46,12 @@ public class HapDbContext : DbContext
     public DbSet<CycleLateOverride> CycleLateOverrides => Set<CycleLateOverride>();
     public DbSet<Domain.Rollups.RollupSnapshot> RollupSnapshots => Set<Domain.Rollups.RollupSnapshot>();
 
+    // Initiative register (HAP-13, migration #6). Register data — NOT individual assessment data —
+    // so these carry public DbSets and are readable outside the visibility seam.
+    public DbSet<Domain.Register.Initiative> Initiatives => Set<Domain.Register.Initiative>();
+    public DbSet<Domain.Register.HarrisCategory> HarrisCategories => Set<Domain.Register.HarrisCategory>();
+    public DbSet<Domain.Register.HarrisStageMap> HarrisStageMaps => Set<Domain.Register.HarrisStageMap>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -262,5 +268,11 @@ public class HapDbContext : DbContext
         // close (research D4). Aggregate output, not individual data, so unlike the assessment tables it
         // carries a public DbSet; append-only is enforced at the DB by the migration's triggers.
         modelBuilder.ApplyConfiguration(new Persistence.RollupSnapshotConfiguration());
+
+        // The initiative register (HAP-13, migration #6) — register data with public DbSets. The
+        // Harris category + stage-map tables are seeded reference data (FR-027/FR-064).
+        modelBuilder.ApplyConfiguration(new Persistence.HarrisCategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new Persistence.HarrisStageMapConfiguration());
+        modelBuilder.ApplyConfiguration(new Persistence.InitiativeConfiguration());
     }
 }

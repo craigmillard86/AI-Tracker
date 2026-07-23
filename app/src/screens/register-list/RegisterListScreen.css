@@ -1,0 +1,295 @@
+/* RegisterListScreen — DESIGN.md A4 (DataTable) / A6 layout; IA per docs/design/mockups/register-list.html
+   (binding). Built exclusively from tokens.css; no new colours, radii, shadows, or type sizes. */
+
+.register-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+/* The single primary CTA per view (DESIGN.md A3): filled brand-teal pill. */
+.register-cta {
+  flex: none;
+  font-family: var(--font-family-ui);
+  font-weight: var(--type-button-weight);
+  font-size: var(--type-button-size);
+  color: var(--color-pure-white);
+  background: var(--color-brand-teal);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-pill);
+  height: 40px;
+  padding: 0 var(--space-lg);
+  cursor: pointer;
+}
+
+.register-cta:hover {
+  background: var(--color-feedback-info);
+}
+
+.register-crumb {
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+  margin-bottom: var(--space-sm);
+}
+
+.register-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--type-page-title-size);
+  line-height: var(--type-page-title-line);
+  font-weight: var(--type-page-title-weight);
+  color: var(--color-page-black);
+}
+
+.register-subtitle {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.register-status {
+  margin: var(--space-md) 0;
+  font-size: var(--type-body-size);
+  color: var(--color-slate-text);
+}
+
+.register-status-error {
+  color: var(--color-feedback-error);
+}
+
+/* Filters panel — a card of inline fields (DESIGN.md A4 form inputs). */
+.register-filters {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-end;
+  flex-wrap: wrap;
+  background: var(--color-pure-white);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md-lg);
+  margin-bottom: var(--space-md-lg);
+}
+
+.register-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.register-field-grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.register-field > span {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+}
+
+.register-input {
+  font-family: var(--font-family-ui);
+  font-size: var(--type-body-size);
+  color: var(--color-page-black);
+  border: 1px solid var(--color-border-gray);
+  border-radius: var(--radius-input);
+  padding: 9px var(--space-md-sm);
+  background: var(--color-pure-white);
+}
+
+.register-input:focus {
+  outline: 3px solid var(--color-brand-teal);
+  outline-offset: 0;
+  border-color: var(--color-brand-teal);
+}
+
+/* Results card. */
+.register-card {
+  background: var(--color-pure-white);
+  border: 1px solid var(--color-light-gray-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md-lg) var(--space-lg);
+}
+
+.register-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.register-card-title {
+  margin: 0;
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+}
+
+.register-card-hint {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+}
+
+.register-stale-count {
+  color: var(--color-rag-amber);
+  font-weight: var(--type-card-title-weight);
+}
+
+.register-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: none;
+}
+
+.register-legend-label {
+  font-size: var(--type-table-cell-size);
+  color: var(--color-mid-gray-text);
+  margin-left: var(--space-xs);
+}
+
+/* DataTable (DESIGN.md A4): sticky header, zebra-optional, right-aligned numerics, row hover. The wrap
+   scrolls so the sticky thead pins to the top of the scroll region for long lists. */
+.register-table-wrap {
+  max-height: 640px;
+  overflow: auto;
+}
+
+.register-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-table-cell-size);
+}
+
+.register-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: var(--space-sm) var(--space-md-sm);
+  border-bottom: 1.5px solid var(--color-border-gray);
+  background: var(--color-light-gray-surface);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-mid-gray-text);
+}
+
+.register-table td {
+  padding: var(--space-md-sm);
+  border-bottom: 1px solid var(--color-light-gray-surface);
+  vertical-align: middle;
+}
+
+.register-table tbody tr:hover td {
+  background: var(--color-light-gray-surface);
+}
+
+.register-col-center {
+  text-align: center;
+}
+
+.register-col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Initiative name — a link-styled button (in-app detail is HAP-14; inert here). */
+.register-initiative-link {
+  font-family: var(--font-family-ui);
+  font-size: var(--type-table-cell-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-brand-teal);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.register-initiative-link:hover {
+  color: var(--color-deep-navy);
+  text-decoration: underline;
+}
+
+.register-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-slate-text);
+  background: var(--color-light-gray-surface);
+  border: 1px solid var(--color-border-gray);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+}
+
+.register-stage {
+  color: var(--color-slate-text);
+}
+
+.register-lastupdate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* Pagination controls (DESIGN.md A4 — paginate above 25 rows). */
+.register-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.register-page-btn {
+  font-family: var(--font-family-ui);
+  font-weight: var(--type-button-weight);
+  font-size: var(--type-table-cell-size);
+  color: var(--color-brand-teal);
+  background: var(--color-pure-white);
+  border: 1.5px solid var(--color-brand-teal);
+  border-radius: var(--radius-pill);
+  height: 32px;
+  padding: 0 var(--space-md);
+  cursor: pointer;
+}
+
+.register-page-btn:disabled {
+  color: var(--color-mid-gray-text);
+  border-color: var(--color-border-gray);
+  cursor: default;
+}
+
+.register-page-status {
+  font-size: var(--type-table-cell-size);
+  color: var(--color-slate-text);
+  font-weight: var(--type-card-title-weight);
+}
+
+.register-pagination-hint {
+  margin-top: var(--space-md);
+}
+
+.register-empty {
+  padding: var(--space-lg) 0;
+}
+
+.register-empty-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  color: var(--color-page-black);
+}

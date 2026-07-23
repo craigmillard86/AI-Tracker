@@ -1,0 +1,35 @@
+/* LevelBadge — DESIGN.md A2 (AI-DLC maturity ramp L0-L3). Built exclusively from tokens.css; no new
+   colours, radii, shadows, or type sizes. The level number is always the visible text. */
+
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-card-title-weight);
+  letter-spacing: 0.3px;
+}
+
+.level-badge-0 {
+  background: var(--color-level-0);
+  color: var(--color-page-black);
+}
+
+.level-badge-1 {
+  background: var(--color-level-1);
+  color: var(--color-deep-navy);
+}
+
+.level-badge-2 {
+  background: var(--color-level-2);
+  color: var(--color-pure-white);
+}
+
+.level-badge-3 {
+  background: var(--color-level-3);
+  color: var(--color-pure-white);
+}
