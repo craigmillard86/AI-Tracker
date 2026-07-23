@@ -680,3 +680,13 @@ But that leaves a real semantics choice: the declaration is a single BU level (0
 **Provisional answer in effect (per CLAUDE.md §6.3):** use the **modal** per-person floor level as the single "measured floor level" for the panel + divergence — representative of the typical member, surfaces over-declaration reasonably. Computed from `FloorLevelDistribution`, suppression inherited (suppressed → null).
 **Owner/HAP-16 action:** ratify the exact declared-vs-measured summary rule — this is Harris-reporting semantics that HAP-16 (the submission engine) and G2 reconciliation formalize; modal is a placeholder. Confirm against the actual Harris form's declared-vs-measured question if it specifies one.
 **Status:** OPEN (provisional in effect)
+
+## 2026-07-23 · HAP-18 (domain panel) · Q-034 — owner-nag "7-day overdue" threshold: inclusive (day 7) or exclusive (day 8)?
+
+The HAP-18 weekly-update owner nag fires on `DaysSinceUpdate > 7` (first nag on day 8, exclusive), per FR-037 / the HAP-18 story AC which literally say ">7d". But root spec §4.2 says the reminder is sent "**on day 7**" — the more natural reading is inclusive (fires when the 7-day mark is reached, i.e. `>=7`). The dev implemented the story AC verbatim and pinned "exactly 7 days is not yet overdue" in tests. The 14-day BU-Lead escalation stays exclusive (`>14`), correctly — root spec phrases that as "**after** two missed weeks."
+
+So there's a story-AC-vs-root-spec off-by-one on the owner nag only, resolved silently in code rather than recorded (cf. Q-031 which properly recorded the cycle-length assumption).
+
+**Provisional answer in effect (per CLAUDE.md §6.3):** keep the shipped `>7d` (day-8) behaviour — it matches the story's own AC text and is a one-day nag-timing detail, not a correctness/privacy issue.
+**Owner action:** ratify the nag-timing convention — `>7d` (day 8, as shipped) vs `>=7d` (day 7, the more literal root-spec reading). One-line config/threshold change either way (the threshold is already config in `NotificationCadenceOptions`). Calibration risk only.
+**Status:** OPEN (provisional in effect)
