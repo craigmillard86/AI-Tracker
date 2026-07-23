@@ -642,3 +642,11 @@ These are arguably **two different concepts** and the divergence may be correct 
 **Provisional answer in effect (per CLAUDE.md §6.3):** leave as-is — StaleRowFlag stays a stage-agnostic data-freshness indicator; the overdue banner is the stage-gated compliance signal. No change to HAP-13.
 **Owner action:** rule on whether that split is intended, or whether the list stale-flag should ALSO be stage-aware (suppress/soften for Idea/Retired) so the two screens tell one story. Either way it's an L1 register-list tweak; not a privacy or reconciliation issue.
 **Status:** OPEN (provisional in effect)
+
+## 2026-07-23 · HAP-14 (design panel) · Q-030 — StageTimeline current-node dot: DESIGN.md A8 "brand-teal" vs mockup's illustrative red dot
+
+Raised by the HAP-14 design review. `register-detail.html` illustrates the StageTimeline's **current-node dot going red** for an off-track (RAG-red) initiative, but DESIGN.md A8's authored component spec says StageTimeline has a **"brand-teal current node"** (a considered token-level choice, dated 2026-07-21 via plan 001, i.e. resolved before HAP-14 was built). HAP-14 correctly implemented A8 (brand-teal), and per the tolerance rule DESIGN.md tokens win over a mockup pixel — so this is **not a HAP-14 defect** and was ruled acceptable. The binding "red-RAG state" on the screen is independently satisfied by the identity-card `RagChip` ("Off Track", text-labelled), and StageTimeline satisfies colour-independence via its own textual `current` tag.
+
+**Provisional answer in effect:** A8 stands — brand-teal current node; the mockup's red dot is treated as illustrative only.
+**Design-owner action:** reconcile the two so future readers aren't misled — either (i) update A8 to "brand-teal current node, or RAG-status colour when the current stage's latest update is off-track" if the red dot is the intended design, or (ii) update the mockup's inline demo to drop the red dot. Either is a reviewed DESIGN.md/mockup commit (§8.2), not a feature-story change.
+**Status:** OPEN (provisional in effect)
