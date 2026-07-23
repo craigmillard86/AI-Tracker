@@ -46,7 +46,7 @@ As an EVP (or delegate), I declare my BU's weekly AI-DLC level beside the measur
 - [x] `POST /api/bus/{buId}/metrics` month N: YTD fields pre-populated from month N-1 for editing; SOR field starts empty/current-month-only (FR-048 tests for both behaviours).
 - [x] UI implements the mockup: two forms side-by-side/stacked per layout, EvidencePanel beside the declaration (level distribution + trend, divergence sentence), YTD carry-forward visible as pre-filled values.
 - [x] vitest-axe passes; strings externalised; tokens only.
-- [x] Wiki/guide (DR-0003, at closure): create `docs/user-guide/bu-declarations-and-metrics.md`. — **NOT YET DONE, correctly so**: this clause is explicitly scoped "at closure" (Phase 4, the lead's job per CLAUDE.md §10.2), not a QA-window deliverable. QA confirms the clause's own text defers it; leaving unchecked is accurate, not a QA finding.
+- [x] Wiki/guide (DR-0003, at closure): create `docs/user-guide/bu-declarations-and-metrics.md`. — **Created at closure (Phase 4).** (QA correctly deferred this clause to closure per its own "at closure" scoping; the lead created it during the four-box.)
 - [x] `./scripts/verify.sh` green (migration idempotent).
 
 ## Attempts / notes
