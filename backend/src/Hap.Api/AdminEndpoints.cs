@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Hap.Api.Authorization;
+using Hap.Api.Notifications;
 using Hap.Domain.Audit;
 using Hap.Domain.Org;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Directory;
+using Hap.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace Hap.Api;
@@ -148,6 +150,30 @@ public static class AdminEndpoints
 
             var result = await retention.RunAsync(runByPersonId, asOf: null, ct);
             return Results.Ok(new RetentionRunResponse(result.AssessmentsErased, result.ScoreRowsErased));
+        });
+
+        // POST /api/admin/notifications/run — runs the notification jobs once, synchronously (HAP-18,
+        // research D7: the deterministic test/demo trigger — no background timer to race in a test).
+        // Response is a flat Dictionary<string,int> so job types can be added without changing the shape.
+        // Runs the FR-037 weekly-update-discipline job and the FR-061 cycle reminder/escalation job (the
+        // FR-057 moderation-complete notice is event-driven off the moderation write, not a scheduled job,
+        // so it is not run here).
+        admin.MapPost("/notifications/run", async (
+            NotificationJobService notifications, CycleReminderJob cycleReminders, CancellationToken ct) =>
+        {
+            var weeklyUpdate = await notifications.RunWeeklyUpdateNagsAsync(asOf: null, ct);
+            var cycle = await cycleReminders.RunAsync(asOf: null, ct);
+            var counts = new Dictionary<string, int>
+            {
+                ["WeeklyUpdateOwnerNags"] = weeklyUpdate.OwnerNagsSent,
+                ["WeeklyUpdateBuLeadEscalations"] = weeklyUpdate.BuLeadEscalationsSent,
+                ["WeeklyUpdateBuLeadEscalationsSkippedNoLead"] = weeklyUpdate.BuLeadEscalationsSkippedNoLead,
+                ["CycleReminders"] = cycle.NonResponderRemindersSent,
+                ["CycleManagerEscalations"] = cycle.ManagerEscalationsSent,
+                ["CycleBuLeadSummaries"] = cycle.BuLeadSummariesSent,
+                ["CycleBuLeadSummariesSkippedNoLead"] = cycle.BuLeadSummariesSkippedNoLead,
+            };
+            return Results.Ok(counts);
         });
     }
 }

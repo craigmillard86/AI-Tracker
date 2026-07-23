@@ -40,6 +40,7 @@ public sealed class ManagerModerationService
     private readonly CycleService _cycles;
     private readonly IAuditWriter _audit;
     private readonly ErasureLedger _ledger;
+    private readonly ModerationCompleteNotifier _notifier;
 
     public ManagerModerationService(
         HapDbContext db,
@@ -49,7 +50,8 @@ public sealed class ManagerModerationService
         OrgGraphLoader graphLoader,
         CycleService cycles,
         IAuditWriter audit,
-        ErasureLedger ledger)
+        ErasureLedger ledger,
+        ModerationCompleteNotifier notifier)
     {
         _db = db;
         _store = store;
@@ -59,6 +61,7 @@ public sealed class ManagerModerationService
         _cycles = cycles;
         _audit = audit;
         _ledger = ledger;
+        _notifier = notifier;
     }
 
     /// <summary>
@@ -405,6 +408,11 @@ public sealed class ManagerModerationService
         {
             throw new ModerationValidationException(ex.Message);
         }
+
+        // FR-057 moderation-complete notice — fired ONLY after the store write above has committed
+        // (no exception reached here). Best-effort: NotifyAsync swallows and logs its own failures, so
+        // a mail outage can never turn this already-successful moderation into a failed request.
+        await _notifier.NotifyAsync(subjectPersonId, cycle.Name, ct);
     }
 
 

@@ -1,0 +1,11 @@
+{{BusinessUnitName}}: outstanding "{{CycleName}}" self-assessments by team ({{DaysUntilClose}} day(s) left) (ref: {{DedupToken}})
+
+Ahead of the "{{CycleName}}" cycle close in {{DaysUntilClose}} day(s), these teams in
+{{BusinessUnitName}} have members who have not yet submitted their self-assessment:
+
+{{PerTeamSummary}}
+
+This is a submission-status summary only — it reports per-team counts, names no individuals, and
+contains no assessment scores.
+
+This is an automated escalation from the HIG AI Adoption Platform.

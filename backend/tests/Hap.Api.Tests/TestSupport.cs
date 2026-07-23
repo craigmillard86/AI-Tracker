@@ -4,6 +4,7 @@ using Hap.Domain.Audit;
 using Hap.Infrastructure;
 using Hap.Infrastructure.Audit;
 using Hap.Infrastructure.Directory;
+using Hap.Infrastructure.Email;
 using Hap.Synth;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -33,6 +34,12 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
     public SwappableDirectorySource Directory { get; } = new();
     public SwappableSeedUserSource SeedUsers { get; } = new();
 
+    /// <summary>HAP-18: the swappable IEmailSender backing every notification send in tests, default
+    /// pointed at a fresh RecordingEmailSender (mirrors Directory/SeedUsers below). Tests that want a
+    /// clean capture list swap in a new RecordingEmailSender: <c>_factory.Emails.Inner = new
+    /// RecordingEmailSender();</c>.</summary>
+    public SwappableEmailSender Emails { get; } = new();
+
     /// <summary>The canonical generator's seed-user list (HAP-2), for tests that want the real
     /// seven-role fixture without hand-building one.</summary>
     public IReadOnlyList<SeedUserRecord> CanonicalSeedUsers { get; }
@@ -55,6 +62,7 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
             })
             .ToList();
         SeedUsers.Inner = new StubSeedUserSource(CanonicalSeedUsers);
+        Emails.Inner = new RecordingEmailSender();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -79,6 +87,16 @@ public sealed class HapApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<ISeedUserSource>();
             services.AddSingleton<ISeedUserSource>(SeedUsers);
+
+            // HAP-18: swap the production MailKit sender for the in-memory recorder, and the
+            // mailpit-backed ledger for a process-lifetime in-memory one — no real mailpit container
+            // is provisioned for this fixture (see NotificationJobMailpitIntegrationTests for the one
+            // real-mailpit test in this story).
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(Emails);
+
+            services.RemoveAll<ISentMailLedger>();
+            services.AddSingleton<ISentMailLedger>(new InMemorySentMailLedger());
         });
     }
 
@@ -174,6 +192,32 @@ public sealed class StubSeedUserSource : ISeedUserSource
 
     public Task<IReadOnlyList<SeedUserRecord>> GetUsersAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_users);
+}
+
+/// <summary>An <see cref="IEmailSender"/> whose backing sender can be swapped between tests (mirrors
+/// <see cref="SwappableDirectorySource"/>/<see cref="SwappableSeedUserSource"/>).</summary>
+public sealed class SwappableEmailSender : IEmailSender
+{
+    public IEmailSender Inner { get; set; } = default!;
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default) =>
+        Inner.SendAsync(message, cancellationToken);
+}
+
+/// <summary>Captures every <see cref="EmailMessage"/> sent into an in-memory list — the default
+/// backing sender behind <see cref="HapApiFactory.Emails"/>, for asserting recipient/content in the
+/// fast (non-mailpit) acceptance tests.</summary>
+public sealed class RecordingEmailSender : IEmailSender
+{
+    private readonly List<EmailMessage> _sent = new();
+
+    public IReadOnlyList<EmailMessage> Sent => _sent;
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        _sent.Add(message);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Fluent builders for small, readable directory snapshots.</summary>

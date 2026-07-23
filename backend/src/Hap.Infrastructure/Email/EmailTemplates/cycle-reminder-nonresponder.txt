@@ -1,0 +1,8 @@
+Reminder: submit your "{{CycleName}}" self-assessment ({{DaysUntilClose}} day(s) left) (ref: {{DedupToken}})
+
+You have not yet submitted your self-assessment for the "{{CycleName}}" cycle.
+
+The cycle closes in {{DaysUntilClose}} day(s). Please complete and submit it here: {{DeepLinkPath}}
+
+This is an automated reminder from the HIG AI Adoption Platform. It contains none of your assessment
+data — sign in to complete and submit your self-assessment.

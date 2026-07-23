@@ -1,0 +1,8 @@
+Overdue weekly updates in {{BusinessUnitName}} (ref: {{DedupToken}})
+
+The following initiatives in {{BusinessUnitName}} have not had a weekly update in over 7 days:
+- {{OverdueInitiativesList}}
+
+Please follow up with the initiative owners.
+
+This is an automated escalation from the HIG AI Adoption Platform.

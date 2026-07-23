@@ -37,6 +37,21 @@ public interface IAssessmentStore
         Guid cycleId, IReadOnlyCollection<Guid> personIds, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The subset of <paramref name="invitedPersonIds"/> who have NOT yet reached
+    /// <see cref="AssessmentState.Submitted"/>/<see cref="AssessmentState.Moderated"/>/
+    /// <see cref="AssessmentState.AutoAdopted"/> for <paramref name="cycleId"/> — i.e. still
+    /// <see cref="AssessmentState.NotStarted"/> (no row) or <see cref="AssessmentState.InProgress"/>
+    /// (HAP-18, FR-061). Purpose-built for the cycle-wide reminder/escalation fan-out: it returns ONLY
+    /// person ids, never an <see cref="Assessment"/>, a state, or any other field — the caller (the
+    /// PlatformAdmin-gated notification job, not a person-scoped read) has no chain-authorization
+    /// decision to make, matching <c>RetentionService</c>'s whole-population admin-job precedent, but the
+    /// return shape is deliberately the narrowest thing that answers "who still needs a reminder" so
+    /// nothing richer than that leaves the seam.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetNonResponderPersonIdsAsync(
+        Guid cycleId, IReadOnlyCollection<Guid> invitedPersonIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Applies a manager's moderation to the assessment (HAP-9; FR-008/009/010). Atomic: every
     /// per-dimension manager score/comment (<paramref name="decisions"/>), the
     /// <c>Submitted → Moderated</c> transition (recording <paramref name="moderatedByPersonId"/>), and the

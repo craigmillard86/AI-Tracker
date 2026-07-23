@@ -38,6 +38,10 @@ public static class AuthorizationServiceCollectionExtensions
         // audit). Wraps the same request-scoped store/gateway/context — a cross-person read never escapes
         // the seam.
         services.AddScoped<ManagerModerationService>();
+        // FR-057 moderation-complete notice (HAP-18, L3): a minimal post-commit side effect of the
+        // moderation write above — no score/individual data, see its class doc. Scoped — wraps the
+        // same request-scoped HapDbContext.
+        services.AddScoped<ModerationCompleteNotifier>();
 
         // The aggregate-read gateway (HAP-11): BU dashboard, org rollups, own-team summary. Scope decided
         // in-seam (hierarchy anchors + explicit grants, Q-024); every figure projected through the F2

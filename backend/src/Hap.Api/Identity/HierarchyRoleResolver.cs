@@ -145,6 +145,90 @@ public sealed class HierarchyRoleResolver
         return new HierarchyRoles(isManager, portfolioLeaderOf, groupLeaderOf, buLeadOf);
     }
 
+    /// <summary>
+    /// Batch form of <see cref="ResolveAsync"/>: computes <see cref="HierarchyRoles"/> for the WHOLE
+    /// active population in one call (HAP-18, FR-037 BU Lead escalation — a notification run needs to
+    /// resolve the BU Lead for every business unit that has an overdue initiative, not one query per
+    /// person).
+    ///
+    /// Deliberately DUPLICATES <see cref="ResolveAsync"/>'s ~20-line depth-from-root algorithm rather
+    /// than refactoring either method to call the other: this algorithm carries a red-team-flagged
+    /// known limitation (Q-014, see the class doc above) that earlier panels have scrutinized closely
+    /// against <see cref="ResolveAsync"/>'s exact existing shape. Minimising the diff to
+    /// <see cref="ResolveAsync"/> itself — leaving it completely untouched — is deliberate risk
+    /// reduction for this story, not laziness.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, HierarchyRoles>> ResolveAllAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var people = await _db.People
+            .Where(p => p.IsActive)
+            .Select(p => new PersonNode(p.Id, p.ManagerPersonId, p.BusinessUnitId))
+            .ToListAsync(cancellationToken);
+
+        var byId = people.ToDictionary(p => p.Id);
+
+        var activeReportCounts = people
+            .Where(p => p.ManagerPersonId.HasValue)
+            .GroupBy(p => p.ManagerPersonId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var roots = people
+            .Where(p => p.ManagerPersonId is null && activeReportCounts.ContainsKey(p.Id))
+            .Select(p => p.Id)
+            .ToHashSet();
+
+        // Batch the BU -> Group -> Portfolio lookups once instead of one query per qualifying person
+        // (ResolveAsync's per-call shape) — cheap at this scale (~23 BUs) but avoids an N+1 pattern
+        // for a whole-population run.
+        var businessUnitGroups = await _db.BusinessUnits
+            .Select(b => new { b.Id, b.GroupId })
+            .ToDictionaryAsync(b => b.Id, b => b.GroupId, cancellationToken);
+        var groupPortfolios = await _db.Groups
+            .Select(g => new { g.Id, g.PortfolioId })
+            .ToDictionaryAsync(g => g.Id, g => g.PortfolioId, cancellationToken);
+
+        var result = new Dictionary<Guid, HierarchyRoles>();
+        foreach (var person in people)
+        {
+            bool isManager = activeReportCounts.ContainsKey(person.Id);
+            int? depth = ComputeDepthFromRoot(person.Id, byId, roots);
+
+            Guid? portfolioLeaderOf = null;
+            Guid? groupLeaderOf = null;
+            Guid? buLeadOf = null;
+
+            // Same gate as ResolveAsync: a depth-1/2/3 person with zero active reports must not
+            // carry a leadership label.
+            if (isManager && depth is 1 or 2 or 3)
+            {
+                var groupId = businessUnitGroups[person.BusinessUnitId];
+
+                if (depth == 3)
+                {
+                    buLeadOf = person.BusinessUnitId;
+                }
+                else
+                {
+                    var portfolioId = groupPortfolios[groupId];
+
+                    if (depth == 2)
+                    {
+                        groupLeaderOf = groupId;
+                    }
+                    else // depth == 1
+                    {
+                        portfolioLeaderOf = portfolioId;
+                    }
+                }
+            }
+
+            result[person.Id] = new HierarchyRoles(isManager, portfolioLeaderOf, groupLeaderOf, buLeadOf);
+        }
+
+        return result;
+    }
+
     /// <summary>Walks the manager chain upward from <paramref name="personId"/>, counting steps,
     /// until it either reaches a validated root (returns the step count) or runs out of chain
     /// (null manager on a non-root node, or an unresolved manager id — returns null: undefined

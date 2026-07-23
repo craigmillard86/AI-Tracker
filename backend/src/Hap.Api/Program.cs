@@ -1,8 +1,11 @@
 using Hap.Api;
 using Hap.Api.Authorization;
 using Hap.Api.Identity;
+using Hap.Api.Notifications;
 using Hap.Infrastructure;
+using Hap.Infrastructure.Email;
 using Hap.Infrastructure.Frameworks;
+using Hap.Infrastructure.Notifications;
 using Hap.Infrastructure.Register;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,7 +41,19 @@ var harrisTaxonomyDefinitionPath =
     ?? Environment.GetEnvironmentVariable("HAP_HARRIS_TAXONOMY_DEFINITION")
     ?? HarrisTaxonomyDefinitionLocator.ResolveDefaultPath();
 
-builder.Services.AddHapInfrastructure(snapshotPath, frameworkDefinitionPath, harrisTaxonomyDefinitionPath);
+// Base URL for mailpit's REST API (HAP-18, FR-037) — the durable "already sent today" record
+// MailpitSentMailLedger queries (see its class doc: mailpit's own message store IS the ledger, no
+// sent-log table). Same override-then-fallback shape as the paths above; docker-compose's api
+// service sets Mailpit__ApiBaseUrl to the container DNS name.
+var mailpitApiBaseUrl =
+    builder.Configuration["Mailpit:ApiBaseUrl"]
+    ?? Environment.GetEnvironmentVariable("HAP_MAILPIT_API")
+    ?? "http://mailpit:8025";
+
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+
+builder.Services.AddHapInfrastructure(
+    snapshotPath, frameworkDefinitionPath, harrisTaxonomyDefinitionPath, mailpitApiBaseUrl);
 
 // Path to the seed-users file (scripts/synth/generate.sh output) the local dev provider's
 // role-picker reads (FR-055). Same configurable-path convention as the directory snapshot above.
@@ -52,6 +67,21 @@ builder.Services.AddHapIdentity(seedUsersPath);
 // The visibility seam (CLAUDE.md §2). Foundation services only for now; the assessment-read gateway
 // comes online with HAP-8's DbSet-backed store.
 builder.Services.AddHapAuthorization();
+
+// Resolves each BU's notification recipient ("BU lead") from an explicit BU-anchored BuDelegate grant —
+// the same structural anchor the visibility seam (AssessmentReads.ClassifyReader) uses, so a BU-lead
+// summary/escalation never reaches anyone the seam would deny a read of that BU's data. Deliberately NOT
+// HierarchyRoleResolver's depth-from-root label, which mislabels a stranger as a BU's lead on a
+// non-uniform tree (Q-014; HAP-18 QA Findings 1 & 2). See RoleGrantBuLeadResolver's class doc.
+builder.Services.AddScoped<IBuLeadResolver, RoleGrantBuLeadResolver>();
+
+// FR-061 cycle reminders/escalations (HAP-18, L3). The cadence is configuration, not a schema column
+// (QUESTIONS.md Q-031): "days before close" is measured against OpensAt + a configured cycle length.
+// The job lives in Hap.Api (not Hap.Infrastructure like the FR-037 job) because it consumes the seam's
+// sanctioned state-only non-responder read and the chain resolver, both Hap.Api types.
+builder.Services.Configure<NotificationCadenceOptions>(
+    builder.Configuration.GetSection(NotificationCadenceOptions.SectionName));
+builder.Services.AddScoped<CycleReminderJob>();
 
 var app = builder.Build();
 

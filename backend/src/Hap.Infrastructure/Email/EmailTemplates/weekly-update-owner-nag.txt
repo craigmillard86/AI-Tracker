@@ -1,0 +1,7 @@
+Overdue weekly update: {{InitiativeName}} (ref: {{DedupToken}})
+
+Your initiative "{{InitiativeName}}" has not had a weekly update in {{DaysOverdue}} days.
+
+Please post a weekly update as soon as possible: {{DeepLinkPath}}
+
+This is an automated reminder from the HIG AI Adoption Platform.

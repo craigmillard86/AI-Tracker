@@ -89,6 +89,29 @@ public sealed class SeamAssessmentStore : IAssessmentStore, ISelfAssessmentStore
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlySet<Guid>> GetNonResponderPersonIdsAsync(
+        Guid cycleId, IReadOnlyCollection<Guid> invitedPersonIds, CancellationToken cancellationToken = default)
+    {
+        if (invitedPersonIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var ids = invitedPersonIds as IReadOnlyList<Guid> ?? invitedPersonIds.ToList();
+
+        // Anyone who reached Submitted/Moderated/AutoAdopted has responded — everyone else (a row still
+        // InProgress, or no row at all — AssessmentState.NotStarted has no persisted row, see Assessment's
+        // class doc) is a non-responder.
+        var responded = await Assessments.AsNoTracking()
+            .Where(a => a.CycleId == cycleId && ids.Contains(a.PersonId)
+                && a.State != AssessmentState.NotStarted && a.State != AssessmentState.InProgress)
+            .Select(a => a.PersonId)
+            .ToListAsync(cancellationToken);
+        var respondedSet = responded.ToHashSet();
+
+        return ids.Where(id => !respondedSet.Contains(id)).ToHashSet();
+    }
+
     public async Task ModerateAsync(
         Guid assessmentId,
         Guid moderatedByPersonId,

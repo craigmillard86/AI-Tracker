@@ -45,6 +45,10 @@ public sealed class OrgGraphRealDirectoryTests
             Guid cycleId, IReadOnlyCollection<Guid> personIds, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlySet<Guid>> GetNonResponderPersonIdsAsync(
+            Guid cycleId, IReadOnlyCollection<Guid> invitedPersonIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task ModerateAsync(
             Guid assessmentId, Guid moderatedByPersonId, IReadOnlyList<ManagerScoreInput> decisions,
             Hap.Domain.Audit.AuditLog auditRow, CancellationToken cancellationToken = default) =>

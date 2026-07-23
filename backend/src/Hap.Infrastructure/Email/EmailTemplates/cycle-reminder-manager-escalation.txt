@@ -1,0 +1,11 @@
+Team members with an outstanding "{{CycleName}}" self-assessment ({{DaysUntilClose}} day(s) left) (ref: {{DedupToken}})
+
+The following members of your team have not yet submitted their self-assessment for the "{{CycleName}}"
+cycle, which closes in {{DaysUntilClose}} day(s):
+
+- {{IncompleteList}}
+
+Please remind them to complete and submit. This notice reports submission status only — it contains no
+assessment scores.
+
+This is an automated escalation from the HIG AI Adoption Platform.

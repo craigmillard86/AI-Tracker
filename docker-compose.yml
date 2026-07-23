@@ -33,6 +33,7 @@ services:
       ASPNETCORE_URLS: "http://+:8080"
       Smtp__Host: "mailpit"
       Smtp__Port: "1025"
+      Mailpit__ApiBaseUrl: "http://mailpit:8025"
     ports:
       - "8080:8080"
     depends_on:

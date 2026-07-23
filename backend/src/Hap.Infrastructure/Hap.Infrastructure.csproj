@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <!-- AddHttpClient<T>() for MailpitSentMailLedger (HAP-18) — also brings IOptions<T> and
+         ILogger<T> transitively (Microsoft.Extensions.Http depends on
+         Microsoft.Extensions.{DependencyInjection.Abstractions,Logging.Abstractions,Options}),
+         which MailKitEmailSender/MailpitSentMailLedger need and this plain-library project (unlike
+         Hap.Api's Sdk.Web) does not otherwise carry. -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8">
       <PrivateAssets>all</PrivateAssets>
@@ -11,6 +18,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Hap.Domain\Hap.Domain.csproj" />
+  </ItemGroup>
+
+  <!-- Email templates are content, externalised from C# (FR-067 spirit) — embedded so the compiled
+       assembly is the whole artefact (no copy-to-output gap in the Docker image). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Email\EmailTemplates\**\*.txt" />
   </ItemGroup>
 
 </Project>

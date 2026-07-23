@@ -1,0 +1,8 @@
+Your assessment has been reviewed
+
+Your self-assessment for the "{{CycleName}}" cycle has been reviewed by your manager.
+
+You can view the outcome here: {{DeepLinkPath}}
+
+This is an automated notice from the HIG AI Adoption Platform. It does not contain any of your
+assessment scores or your manager's comments — sign in to view them.
