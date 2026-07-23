@@ -52,6 +52,8 @@ The export **writes an `Export` audit row** (actor == subject), fail-closed (sta
 
 ## G1 privacy gate — readiness
 
+> ✅ **G1 PASSED — 2026-07-23** (owner witness; [DR-0009](../decisions/DR-0009-g1-privacy-gate-signoff.md)). M1 = zero leaks confirmed via live witness (individual assessment readable only by the direct line manager; BU Lead / Group Leader / Portfolio Leader / HIG Executive / Platform Admin all denied; audit fires on every authorized view) plus the green automated V3/suppression/audit suites. All ratification decisions below accepted **as-shipped** (Q-027 RESOLVED; HAP-11 residuals as-shipped; erasure cross-request TOCTOU parked as a durable-fix follow-up).
+
 Closing HAP-12 completes the evidence set for the **human-witnessed G1 privacy gate** (Art. VII). The rehearsal in `quickstart.md` "V3 — Privacy spot-checks" is automated end-to-end by `PrivacySpotChecksV3Tests` on a deterministic hierarchy carrying the DR-0005 canonical refs:
 
 - zero individual reads outside the chain, exercised for all seven roles → 404 + no audit;

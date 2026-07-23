@@ -610,7 +610,7 @@ The per-parent `SuppressionEvaluator.EvaluateLevel` (HAP-10, research D2) enforc
 
 ## 2026-07-22 · HAP-12 (audit completeness, right-of-access export, retention) · Q-027 — GDPR erasure of the non-nullable `AssessmentScore.SelfScore` int without a migration
 
-**Raised:** 2026-07-22 (HAP-12 dev) · **Type:** GDPR retention/erasure implementation shape (L3) · **Status:** OPEN — provisional in effect, owner ratification at G1.
+**Raised:** 2026-07-22 (HAP-12 dev) · **Type:** GDPR retention/erasure implementation shape (L3) · **Status:** RESOLVED 2026-07-23 — owner ratified **as-shipped** at the G1 witness ([DR-0009](DR-0009-g1-privacy-gate-signoff.md)): erasure zeroes `SelfScore`, the `RetentionErasure` audit-ledger row is the authoritative "was erased" record, no tombstone/nullable score column added.
 
 FR-052 requires raw individual scores erased after 3 years (aggregates retained indefinitely via the frozen `RollupSnapshot`). The HAP-12 story forbids a migration (HAP-13 owns the next migration-chain slot) and specifies "nulling values, not dropping rows". Of the `AssessmentScore` value columns, `SelfEvidence` (text), `ManagerScore` (`int?`) and `ManagerComment` (text) are nullable and are set to NULL on erasure. **`SelfScore` is a non-nullable `int`** and cannot be SQL-NULLed without a schema change.
 

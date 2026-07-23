@@ -82,5 +82,5 @@ curl -X POST localhost:8080/api/admin/retention/run
 
 ## Gate readiness (flag, never self-certify)
 
-- **G1 (privacy)** — after HAP-12: owner witnesses V3 executed across all seven roles on the synthetic stack (now automated as above; the owner re-runs the witnessed script). M1 = zero leaks.
+- **G1 (privacy)** — ✅ **PASSED 2026-07-23** (owner witness; [DR-0009](../../docs/decisions/DR-0009-g1-privacy-gate-signoff.md)). Witnessed V3 on the synthetic stack across all seven roles + live zero-leak demonstration; M1 = zero leaks confirmed; ratifications accepted as-shipped. Unblocks HAP-20/G2.
 - **G2 (reporting)** — after HAP-20: owner witnesses V5 for a full weekly + monthly submission reconciled line-by-line.
